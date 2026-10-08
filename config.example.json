@@ -1,0 +1,38 @@
+{
+  "projects": [
+    "my-project",
+    "another-project"
+  ],
+  "projects_dir": "~/projects",
+  "model": "sonnet",
+  "tail_minutes": 60,
+  "u5_pace_margin": 15,
+  "min_window_headroom_pct": 3,
+  "max_u5": 97,
+  "max_u7": 98,
+  "pace_margin": 4,
+  "default_k": 0.12,
+  "min_k_samples": 5,
+  "max_run_minutes": 45,
+  "min_run_minutes": 15,
+  "max_review_iterations": 8,
+  "exhausted_hours": 24,
+  "pr_scope": "autopilot",
+  "streak_limit": 5,
+  "notify_telegram": true,
+  "ramp_gain": 1.3,
+  "max_runs_per_tick": 15,
+  "max_resumes": 3,
+  "resume_max_hours": 48,
+  "open_window_fill": 0.4,
+  "model_by_mode": {
+    "roadmap": "opus",
+    "selfreview": "opus"
+  },
+  "selfreview_days": 7,
+  "selfreview_min_runs": 3,
+  "log_keep_days": 14,
+  "data_keep_days": 90,
+  "min_step_minutes": 30,
+  "digest_minutes": 60
+}

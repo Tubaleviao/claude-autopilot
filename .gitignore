@@ -1,0 +1,13 @@
+logs/
+worktrees/
+state.json
+usage-log.jsonl
+lock
+PAUSE
+__pycache__/
+digest.jsonl
+runs.jsonl
+reports/backup-*/
+reports/stats-*.json
+config.json
+reports/
