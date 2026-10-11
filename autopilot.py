@@ -308,7 +308,7 @@ VALID = {"implement": {"PR_OPENED", "NO_PENDING_STEPS", "INCOMPLETE", "BLOCKED"}
 # INCOMPLETE = "the step is not finished, keep this session and resume it". It is
 # accepted from the model but never offered back to a resumed run (otherwise a
 # resume could stall forever by re-declaring itself incomplete).
-RESUME_MARKERS = {m: " | ".join(sorted(v - {"INCOMPLETE"})) for m, v in VALID.items()}
+RESUME_MARKERS = {m: " | ".join(sorted(v)) for m, v in VALID.items()}
 
 
 def parse_marker(text, mode):
@@ -646,6 +646,9 @@ def _review_work(state, args, proj):
         return None
     p = prs[0]
     ps = state.setdefault(proj, {}).setdefault("prs", {})
+    open_nums = {str(x["number"]) for x in prs}
+    for k in [k for k in ps if k not in open_nums]:  # stale counters of PRs no longer open
+        ps.pop(k)
     it = ps.get(str(p["number"]), 0) + 1
     if it > CFG["max_review_iterations"]:
         sh(["gh", "pr", "edit", str(p["number"]), "-R", slug, "--add-label",
@@ -668,6 +671,11 @@ def pick_and_run(minutes, args, u_before):
     if pend:
         proj, resume = pend
         mode, extra = resume["mode"], resume["extra"]
+        floor = CFG.get("min_step_minutes", 30)
+        if mode in ("implement", "roadmap") and minutes < floor and not args.force:
+            # A short resume answers INCOMPLETE within seconds and burns max_resumes: wait for a real budget.
+            log(f"only {minutes:.0f}m budget (< min_step_minutes {floor}); resume of {proj}/{mode} waits")
+            return False
     elif args.mode == "selfreview" or (not args.mode and selfreview_due(state)):
         proj, mode, extra = SELF, "selfreview", prepare_selfreview()
     else:

@@ -108,6 +108,14 @@ def summarize(days=7):
     out["tick_decisions"] = dict(dec.most_common(15))
     out["ticks"] = len(rows)
 
+    # ---- pooled k first: window feasibility below needs it ----
+    _d5 = _d7 = 0
+    for a, b in zip(rows, rows[1:]):
+        if a.get("ra5") and a.get("ra5") == b.get("ra5") and a.get("ra7") == b.get("ra7"):
+            if b["u5"] - a["u5"] > 0 and b["u7"] - a["u7"] >= 0:
+                _d5, _d7 = _d5 + b["u5"] - a["u5"], _d7 + b["u7"] - a["u7"]
+    KPOOL = [_d7 / _d5 if _d5 else None]
+
     # ---- windows (5h) ----
     wins = defaultdict(list)
     for r in rows:
@@ -119,12 +127,18 @@ def summarize(days=7):
         ended = rs[-1]["r5"] is not None and (rs[-1]["ts"] + rs[-1]["r5"] * 60) < now
         peak = max(r["u5"] for r in rs)
         arun = [x for x in runs if rs[0]["ts"] - 600 <= x["ts"] <= rs[-1]["ts"] + 300]
-        wl.append(dict(resets_at=ra, ended=ended, peak_u5=peak, ticks=len(rs), autopilot_runs=len(arun),
+        k0 = KPOOL[0] or 0.1
+        first = rs[0]
+        wleft = max(first["r7"] * 12 / 60, 1) if first.get("r7") is not None else None
+        feasible = min(100, (100 - first["u7"]) / wleft / k0) if wleft and first.get("u7") is not None else 100
+        wl.append(dict(resets_at=ra, ended=ended, peak_u5=peak, feasible_u5=round(feasible, 1), ticks=len(rs), autopilot_runs=len(arun),
                        autopilot_minutes=round(sum(x["duration_s"] for x in arun) / 60, 1)))
     done = [w for w in wl if w["ended"]]
     out["windows"] = dict(
         n=len(wl), ended=len(done), mean_peak_u5_ended=mean([w["peak_u5"] for w in done]),
         ended_below_80pct=sum(1 for w in done if w["peak_u5"] < 80),
+        ended_below_80pct_of_feasible=sum(1 for w in done if w["peak_u5"] < 0.8 * w["feasible_u5"]),
+        note="feasible_u5 = weekly-feasible window share at window start: need / windows_left / k",
         wasted_headroom_pct_total=round(sum(100 - w["peak_u5"] for w in done), 1),
         recent=wl[-12:])
 
@@ -133,8 +147,16 @@ def summarize(days=7):
     for r in rows:
         if r.get("ra7"):
             wk[r["ra7"]].append(r)
+    def daily_vs_pace(rs):
+        days = {}
+        for r in sorted(rs, key=lambda r: r["ts"]):
+            if r.get("r7") is not None and r.get("u7") is not None:
+                pace = 100 * (1 - r["r7"] / 168)
+                days[datetime.fromtimestamp(r["ts"]).strftime("%m-%d")] = round(r["u7"] - pace, 1)  # last tick of the day
+        return days
     out["weeks"] = [dict(resets_at=ra, u7_first=min(rs, key=lambda r: r["ts"])["u7"],
-                         u7_last=max(rs, key=lambda r: r["ts"])["u7"], ticks=len(rs))
+                         u7_last=max(rs, key=lambda r: r["ts"])["u7"], ticks=len(rs),
+                         u7_minus_pace_by_day=daily_vs_pace(rs))
                     for ra, rs in sorted(wk.items())]
 
     # ---- k (weekly % per window %), pooled like autopilot.learn_k: u7 is an integer, so per-pair
