@@ -22,6 +22,14 @@ CFG = json.loads((AP / "config.json").read_text())
 PROJECTS_DIR = Path(CFG["projects_dir"]).expanduser()
 
 
+def code_sig():
+    """mtimes of the files loaded once at startup; prompts/ are re-read every run."""
+    return tuple((AP / f).stat().st_mtime for f in ("autopilot.py", "config.json"))
+
+
+START_SIG = code_sig()
+
+
 def popt(proj, key, default=None):
     """Per-project override from config "project_opts": roadmap path, push_remote, merge, author_roadmap."""
     return CFG.get("project_opts", {}).get(proj, {}).get(key, default)
@@ -309,6 +317,36 @@ def dep_issues(slug):
         return []
 
 
+def pr_issues(slug, num):
+    """Open issues we filed that mention PR #num: earlier review rounds' follow-ups and blockers."""
+    out = sh(["gh", "issue", "list", "-R", slug, "--state", "open", "--author", "@me", "--limit", "50",
+              "--search", f'"PR #{num}"', "--json", "number,title,body"], check=False)
+    try:
+        issues = json.loads(out or "[]")
+    except ValueError:
+        return []
+    ref = re.compile(rf"\bPR #{num}\b", re.I)  # search is fuzzy: "PR #15" also hits "PR #8 ... 15"
+    return sorted(({"number": i["number"], "title": i["title"]} for i in issues
+                   if ref.search(i["title"] + " " + (i.get("body") or ""))), key=lambda i: -i["number"])
+
+
+def existing_issues_rule(slug, num):
+    """Review prompt text: reuse and merge the issues earlier rounds opened instead of adding more."""
+    issues = pr_issues(slug, num)
+    if not issues:
+        return "None yet."
+    fu = [i for i in issues if i["title"].lower().startswith("follow-ups from pr")]
+    lines = "\n".join(f"  - #{i['number']} {i['title']}" for i in issues)
+    keep = (f"Keep #{fu[0]['number']} as THE follow-up issue: add new Low findings to its checklist "
+            f"(`gh issue edit {fu[0]['number']} -R {slug} --body ...`, keep existing items, tick ones now fixed) "
+            f"instead of opening a new one. " if fu else "")
+    return (f"Earlier rounds opened these (newest first):\n{lines}\n{keep}"
+            f"Before opening any issue, reuse one of these that covers it. If several cover the same thing, keep "
+            f"the newest, copy unique unchecked items from the others into it, and close the others with "
+            f"`gh issue close N -R {slug} --reason \"not planned\" --comment \"Duplicate of #<kept>.\"`. "
+            f"Never close an issue that still has unique unresolved content.")
+
+
 def waits_on_dep(proj, num):
     """True while an open dependency issue in depends_on's repo references <slug>#num."""
     dep = popt(proj, "depends_on")
@@ -360,7 +398,10 @@ def overrides(proj, slug, default, mode):
         dslug = repo_info(dep)[1]
         what = ("If, after everything else is fixed, that dependency is the only thing failing the merge gate, "
                 "comment on the PR linking the issue and finish with marker WAITING (not BLOCKED, not FIXED): "
-                "the PR is parked until the issue closes." if mode == "review" else
+                "the PR is parked until the issue closes. Before finishing, close every issue in EXISTING ISSUES "
+                f"that only asks for that dependency work (`gh issue close N -R {slug} --reason \"not planned\" "
+                f"--comment \"Duplicate. Tracked in {dslug}#<dep issue>.\"`); for one that also lists other items, "
+                "comment that the dependency part moved and leave it open." if mode == "review" else
                 "Still finish and open the step's PR; name the dependency issue in the PR body.")
         rules.append(
             f"- {slug} depends on {dslug} (project {dep}). {popt(proj, 'context', '')} "
@@ -505,6 +546,7 @@ def run_claude(proj, mode, minutes, extra, resume=None):
             ctx = dict(project=proj, worktree=str(wt), slug=slug, default_branch=default,
                        roadmap=popt(proj, "roadmap", "ROADMAP.md"),
                        overrides=overrides(proj, slug, default, mode),
+                       existing_issues=existing_issues_rule(slug, extra["pr"]) if mode == "review" else "",
                        branch_prefix=f"autopilot/{time.strftime('%m%d')}-{sid[:6]}",
                        minutes=int(minutes), **extra)
             prompt = ((AP / "prompts/common.md").read_text() + "\n"
@@ -929,6 +971,9 @@ def tick(args):
     # BURN never yields the tick: it loops until a limit, nothing-to-do or a failed run;
     # cron (flock) restarts it 10 min later.
     for n in (itertools.count() if args.burn else range(CFG["max_runs_per_tick"])):
+        if code_sig() != START_SIG:  # a burn loop lives for hours: let cron start the new code
+            log("autopilot.py/config.json changed since start; exiting so the next tick loads it")
+            return
         try:
             if args.simulate:
                 u = simulated(args.simulate)
