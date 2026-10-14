@@ -34,5 +34,6 @@
   "log_keep_days": 14,
   "data_keep_days": 90,
   "min_step_minutes": 30,
-  "digest_minutes": 60
+  "digest_minutes": 60,
+  "burn": false
 }

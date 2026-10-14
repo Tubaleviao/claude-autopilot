@@ -9,6 +9,7 @@ Cron job that spends leftover Claude Code budget (5h window + weekly) on roadmap
 
 ## Policy
 - **TAIL** (default): run only in last `tail_minutes` of the 5h window (window start stays free for you), if weekly usage isn't ahead of linear pace.
+- **BURN** (`"burn": true` in config.json or `--burn`): spend as fast as possible. Ignores tail, pace line, weekly cap and window-end clamp; runs back-to-back with no `max_runs_per_tick` limit until `max_u5`/`max_u7` is hit, nothing is left to do, or a run fails instantly. Cron restarts it every 10 min; a run cut off by the 5h limit is resumed after reset. Leaves no headroom for interactive use.
 - **SATURATE**: if filling every remaining window barely reaches 100% weekly (learned `k`), run anytime, even opening a new window.
 - **Intra-window pace line**: inside a live window the autopilot may only reach `100 * elapsed_share + u5_pace_margin`% (`u5_pace_margin`, default 15), so it drains leftover budget across the whole window instead of one burst — the rest stays free for you. SATURATE is exempt.
 - Per project (priority order): open `autopilot/*` PR → review+fix until no Medium+ and CI green → squash-merge; else implement the next pending roadmap step **in full** (a step = a whole roadmap section/phase, all its deliverables and acceptance criteria — never a single checklist line, never a "(partial)" PR). While budget remains after a step's PR the run takes the next step (its own branch and PR); a step it cannot finish ends with `INCOMPLETE` and is resumed next run in the same worktree. All exhausted → author 3-6 new feature-sized roadmap steps from deferred steps, open GitHub issues and brainstorming. Review leftovers (`autopilot-followup` issues, one per PR with only Low findings) are never a step on their own: they are folded into a feature step touching the same code, or clustered by area into **sweep** steps that each close 4-12 issues in one PR (at most half the batch, max 3 sweeps per batch).
@@ -21,6 +22,7 @@ Cron job that spends leftover Claude Code budget (5h window + weekly) on roadmap
 ## Usage
     python3 autopilot.py --dry-run
     python3 autopilot.py --simulate "u5=60 r5=20 u7=10 r7=96" --dry-run
+    python3 autopilot.py --burn --dry-run   # burn mode decision
     python3 autopilot.py --force --project my-project --mode implement
     python3 autopilot.py --unblock project-nihon   # release a BLOCKED park
     touch PAUSE   # disable;  rm PAUSE to resume

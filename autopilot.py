@@ -8,8 +8,9 @@ only when the pacing policy says go. See README.md.
   --dry-run                         decide, print, do not launch claude
   --simulate "u5=60 r5=20 u7=10 r7=96"   fake usage (r5 minutes, r7 hours)
   --force --project my-project [--mode implement|review|roadmap]   skip pacing
+  --burn                            no pacing: run back-to-back until a hard limit (also config "burn")
 """
-import argparse, functools, hashlib, json, shutil, statistics, subprocess, time, urllib.error, urllib.request, uuid
+import argparse, functools, itertools, hashlib, json, shutil, statistics, subprocess, time, urllib.error, urllib.request, uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -130,6 +131,19 @@ def learn_k():
 
 # ---------- policy ----------
 WINDOW_MIN = WINDOW_H * 60
+
+
+def decide_burn(u):
+    """BURN: spend as fast as possible. Only the hard max_u5/max_u7 limits stop it.
+
+    No tail, no pace line, no weekly cap, no window-end clamp: a run cut off by
+    the 5h limit is stored as pending and resumed once the window resets.
+    """
+    if u["u5"] >= CFG["max_u5"]:
+        return False, "burn", f"BURN: 5h window full ({u['u5']:.0f}%); waiting for reset", 0
+    if u["u7"] >= CFG["max_u7"]:
+        return False, "burn", f"BURN: weekly full ({u['u7']:.0f}%); waiting for reset", 0
+    return True, "burn", f"BURN u5={u['u5']:.0f}% u7={u['u7']:.0f}%", CFG["max_run_minutes"]
 
 
 def decide(u, k):
@@ -754,7 +768,10 @@ def main():
     ap.add_argument("--project")
     ap.add_argument("--mode", choices=["implement", "review", "roadmap", "selfreview"])
     ap.add_argument("--unblock", metavar="PROJECT", help="clear a human_blocked park set by a BLOCKED run")
+    ap.add_argument("--burn", action="store_true",
+                    help="no pacing: run back-to-back until max_u5/max_u7 (same as config \"burn\": true)")
     args = ap.parse_args()
+    args.burn = args.burn or bool(CFG.get("burn"))
 
     if args.unblock:
         s = load_state()
@@ -776,7 +793,9 @@ def main():
 
 
 def tick(args):
-    for n in range(CFG["max_runs_per_tick"]):
+    # BURN never yields the tick: it loops until a limit, nothing-to-do or a failed run;
+    # cron (flock) restarts it 10 min later.
+    for n in (itertools.count() if args.burn else range(CFG["max_runs_per_tick"])):
         try:
             if args.simulate:
                 u = simulated(args.simulate)
@@ -789,6 +808,8 @@ def tick(args):
         k = learn_k()
         if args.force:
             go, mode, reason, minutes = True, "force", "forced", CFG["max_run_minutes"]
+        elif args.burn:
+            go, mode, reason, minutes = decide_burn(u)
         else:
             go, mode, reason, minutes = decide(u, k)
         if not args.simulate:
