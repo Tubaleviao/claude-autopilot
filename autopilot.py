@@ -20,6 +20,12 @@ if not (AP / "config.json").exists():
     raise SystemExit("config.json missing: copy config.example.json to config.json and edit it")
 CFG = json.loads((AP / "config.json").read_text())
 PROJECTS_DIR = Path(CFG["projects_dir"]).expanduser()
+
+
+def popt(proj, key, default=None):
+    """Per-project override from config "project_opts": roadmap path, push_remote, merge, author_roadmap."""
+    return CFG.get("project_opts", {}).get(proj, {}).get(key, default)
+
 STATE_F = AP / "state.json"
 LOG_F = AP / "usage-log.jsonl"
 RUNS_F = AP / "runs.jsonl"
@@ -242,7 +248,8 @@ def ensure_worktree(proj, repo, default):
 
 def roadmap_hash(proj, default):
     repo = PROJECTS_DIR / proj
-    r = subprocess.run(["git", "show", f"origin/{default}:ROADMAP.md"], cwd=repo, capture_output=True)
+    r = subprocess.run(["git", "show", f"origin/{default}:{popt(proj, 'roadmap', 'ROADMAP.md')}"],
+                       cwd=repo, capture_output=True)
     return hashlib.sha1(r.stdout).hexdigest()
 
 
@@ -255,17 +262,71 @@ def gh_login():
     return _ME[0]
 
 
-def open_prs(slug):
-    out = sh(["gh", "pr", "list", "-R", slug, "--state", "open", "--limit", "50",
-              "--json", "number,headRefName,labels,isCrossRepository,author"])
-    # Only our own same-repo PRs: on a public repo anyone can open a fork PR from a
-    # branch named autopilot/*, and review mode would merge it if it looks clean.
+def remote_owner(proj, remote):
+    url = sh(["git", "remote", "get-url", remote], PROJECTS_DIR / proj)
+    return url.split("github.com")[-1].lstrip(":/").split("/")[0]
+
+
+def open_prs(proj, include_parked=False):
+    _, slug, _ = repo_info(proj)
+    out = sh(["gh", "pr", "list", "-R", slug, "--state", "open", "--limit", "50", "--json",
+              "number,title,headRefName,headRefOid,labels,isCrossRepository,headRepositoryOwner,author"])
+    # Only our own PRs: on a public repo anyone can open a fork PR from a branch named
+    # autopilot/*, and review mode would merge it if it looks clean. A project with
+    # push_remote works from our fork, so its PRs are cross-repo with us as head owner.
     me = gh_login()
+    fork = bool(popt(proj, "push_remote"))
     prs = [p for p in json.loads(out)
-           if not p.get("isCrossRepository") and (p.get("author") or {}).get("login") == me]
+           if (p.get("author") or {}).get("login") == me
+           and bool(p.get("isCrossRepository")) == fork
+           and (not fork or (p.get("headRepositoryOwner") or {}).get("login") == me)]
     if CFG["pr_scope"] == "autopilot":
         prs = [p for p in prs if p["headRefName"].startswith("autopilot/")]
-    return [p for p in prs if "autopilot-stuck" not in [l["name"] for l in p["labels"]]]
+    if include_parked:
+        return prs
+    parked = load_state().get(proj, {}).get("parked_prs", {})
+    return [p for p in prs if "autopilot-stuck" not in [l["name"] for l in p["labels"]]
+            and parked.get(str(p["number"])) != p["headRefOid"]]
+
+
+def park_pr(state, proj, num, by_sha=False):
+    """Stop reviewing a PR. Same-repo PRs get the autopilot-stuck label; READY PRs and PRs
+    on an upstream we cannot label are parked by head SHA, so a new commit un-parks them."""
+    _, slug, _ = repo_info(proj)
+    if by_sha or popt(proj, "push_remote"):
+        sha = sh(["gh", "pr", "view", str(num), "-R", slug, "--json", "headRefOid",
+                  "--jq", ".headRefOid"], check=False)
+        state.setdefault(proj, {}).setdefault("parked_prs", {})[str(num)] = sha
+    else:
+        sh(["gh", "pr", "edit", str(num), "-R", slug, "--add-label", "autopilot-stuck"], check=False)
+
+
+def overrides(proj, slug, default, mode):
+    """Prompt rules for projects that push to a fork and/or must not merge (config project_opts)."""
+    rules, push = [], popt(proj, "push_remote")
+    if push:
+        owner = remote_owner(proj, push)
+        rules += [
+            f"- Remote `origin` is upstream {slug}: read-only for you. Base every new branch on "
+            f"`origin/{default}` and open every PR against {default} (never stack PRs on other branches). "
+            f"Push branches to git remote `{push}` (owner {owner}); wherever a step says `git fetch origin` "
+            f"or `origin/<branch>` for a PR branch, use `{push}` instead.",
+            f"- Open PRs with `gh pr create -R {slug} --base {default} --head {owner}:<branch> ...`.",
+            f"- Never create issues or labels on {slug}: you do not own it. Where a step says to open an "
+            f"issue, post that content as a PR comment (`gh pr comment`) instead; skip `Closes #n` lines."]
+    if not popt(proj, "merge", True):
+        rules.append(
+            "- NEVER merge a PR (no `gh pr merge`): upstream maintainers merge. In review mode, when the "
+            "merge gate passes (CI green, or CI on this fork PR awaits maintainer approval and local "
+            "tests pass), finish with marker READY instead of MERGED.")
+        if mode == "implement":
+            titles = [f"  - #{p['number']} {p['title']}" for p in open_prs(proj, include_parked=True)]
+            if titles:
+                rules.append("- These open PRs already implement roadmap steps and await upstream merge: "
+                             "treat their steps as done and pick the next pending step.\n" + "\n".join(titles))
+    if not rules:
+        return ""
+    return "\nPROJECT OVERRIDES (take precedence over the task steps below)\n" + "\n".join(rules) + "\n"
 
 
 DIGEST_F = AP / "digest.jsonl"
@@ -315,7 +376,7 @@ def send_telegram(msg):
 
 # ---------- run claude ----------
 VALID = {"implement": {"PR_OPENED", "NO_PENDING_STEPS", "INCOMPLETE", "BLOCKED"},
-         "review": {"MERGED", "FIXED", "BLOCKED"},
+         "review": {"MERGED", "READY", "FIXED", "BLOCKED"},
          "roadmap": {"PR_OPENED", "NO_NEW_ITEMS", "BLOCKED"},
          "selfreview": {"REVIEW_DONE", "BLOCKED"}}
 
@@ -386,6 +447,8 @@ def run_claude(proj, mode, minutes, extra, resume=None):
         else:
             wt = ensure_worktree(proj, repo, default)
             ctx = dict(project=proj, worktree=str(wt), slug=slug, default_branch=default,
+                       roadmap=popt(proj, "roadmap", "ROADMAP.md"),
+                       overrides=overrides(proj, slug, default, mode),
                        branch_prefix=f"autopilot/{time.strftime('%m%d')}-{sid[:6]}",
                        minutes=int(minutes), **extra)
             prompt = ((AP / "prompts/common.md").read_text() + "\n"
@@ -601,8 +664,7 @@ def find_pending(state, projects):
         too_many = p["resumes"] >= CFG["max_resumes"]
         gone = False
         if p["mode"] == "review":
-            _, slug, _ = repo_info(proj)
-            gone = p["extra"]["pr"] not in [x["number"] for x in open_prs(slug)]
+            gone = p["extra"]["pr"] not in [x["number"] for x in open_prs(proj)]
         if stale or too_many or gone:
             log(f"discard pending {proj}/{p['mode']} (stale={stale} too_many={too_many} gone={gone})")
             state[proj].pop("pending")
@@ -635,7 +697,7 @@ def choose_work(state, args):
 
 def _choose_work(state, args, projects, review_projects):
     for proj in review_projects:  # pass A0: open PRs are always finished first
-        if args.mode == "review" or (not args.mode and open_prs(repo_info(proj)[1])):
+        if args.mode == "review" or (not args.mode and open_prs(proj)):
             work = _review_work(state, args, proj)
             if work:
                 return work
@@ -647,15 +709,15 @@ def _choose_work(state, args, projects, review_projects):
     if args.mode in (None, "roadmap"):  # pass B: author new roadmap items (Opus, see model_by_mode)
         for proj in projects:
             _, _, default = repo_info(proj)
-            if not exhausted(state, proj, "roadmap_exhausted", default) \
+            if popt(proj, "author_roadmap", True) \
+                    and not exhausted(state, proj, "roadmap_exhausted", default) \
                     and (args.force or not exhausted(state, proj, "human_blocked", default)):
                 return proj, "roadmap", {}
     return None
 
 
 def _review_work(state, args, proj):
-    _, slug, _ = repo_info(proj)
-    prs = open_prs(slug)
+    prs = open_prs(proj)
     if not prs:
         return None
     p = prs[0]
@@ -665,8 +727,9 @@ def _review_work(state, args, proj):
         ps.pop(k)
     it = ps.get(str(p["number"]), 0) + 1
     if it > CFG["max_review_iterations"]:
-        sh(["gh", "pr", "edit", str(p["number"]), "-R", slug, "--add-label",
-            "autopilot-stuck"], check=False)
+        park_pr(state, proj, p["number"])
+        ps.pop(str(p["number"]), None)  # a SHA-parked PR un-parked by new commits starts over
+        save_state(state)
         notify(f"{proj} PR #{p['number']} stuck after {it-1} review iterations", urgent=True)
         return None
     return proj, "review", dict(pr=p["number"], branch=p["headRefName"], iteration=it,
@@ -736,8 +799,12 @@ def pick_and_run(minutes, args, u_before):
         if marker == "MERGED":
             prs.pop(key, None)
             notify(f"{proj} PR #{extra['pr']} merged")
+        elif marker == "READY":  # merge: false project: clean and green, left for upstream to merge
+            prs.pop(key, None)
+            park_pr(state, proj, extra["pr"], by_sha=True)
+            notify(f"{proj} PR #{extra['pr']} ready for upstream review (not merged)")
         elif marker == "BLOCKED":
-            sh(["gh", "pr", "edit", key, "-R", slug, "--add-label", "autopilot-stuck"], check=False)
+            park_pr(state, proj, extra["pr"])
             notify(f"{proj} PR #{extra['pr']} blocked: unfixable Medium+ finding (issue opened)", urgent=True)
     elif marker == "NO_PENDING_STEPS":
         mark_exhausted(state, proj, "impl_exhausted", default)

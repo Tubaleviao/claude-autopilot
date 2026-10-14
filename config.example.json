@@ -35,5 +35,13 @@
   "data_keep_days": 90,
   "min_step_minutes": 30,
   "digest_minutes": 60,
-  "burn": false
+  "burn": false,
+  "project_opts": {
+    "another-project": {
+      "roadmap": "docs/ROADMAP.md",
+      "push_remote": "fork",
+      "merge": false,
+      "author_roadmap": false
+    }
+  }
 }
