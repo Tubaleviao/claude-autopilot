@@ -10,7 +10,7 @@ only when the pacing policy says go. See README.md.
   --force --project my-project [--mode implement|review|roadmap]   skip pacing
   --burn                            no pacing: run back-to-back until a hard limit (also config "burn")
 """
-import argparse, functools, itertools, hashlib, json, shutil, statistics, subprocess, time, urllib.error, urllib.request, uuid
+import argparse, functools, itertools, hashlib, json, re, shutil, statistics, subprocess, time, urllib.error, urllib.request, uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -284,9 +284,40 @@ def open_prs(proj, include_parked=False):
         prs = [p for p in prs if p["headRefName"].startswith("autopilot/")]
     if include_parked:
         return prs
-    parked = load_state().get(proj, {}).get("parked_prs", {})
+    st = load_state().get(proj, {})
+    parked, waiting = st.get("parked_prs", {}), st.get("waiting_prs", {})
     return [p for p in prs if "autopilot-stuck" not in [l["name"] for l in p["labels"]]
-            and parked.get(str(p["number"])) != p["headRefOid"]]
+            and parked.get(str(p["number"])) != p["headRefOid"]
+            and not (waiting.get(str(p["number"])) == p["headRefOid"] and waits_on_dep(proj, p["number"]))]
+
+
+DEP_LABEL = "autopilot-dependency"
+
+
+def dependents(proj):
+    """Projects whose config says depends_on: proj."""
+    return [p for p in CFG["projects"] if popt(p, "depends_on") == proj]
+
+
+def dep_issues(slug):
+    """Open autopilot-dependency issues on slug: work a dependent repo's PR is waiting for."""
+    out = sh(["gh", "issue", "list", "-R", slug, "--state", "open", "--label", DEP_LABEL, "--author", "@me",
+              "--limit", "50", "--json", "number,title,body,comments"], check=False)
+    try:
+        return json.loads(out or "[]")
+    except ValueError:
+        return []
+
+
+def waits_on_dep(proj, num):
+    """True while an open dependency issue in depends_on's repo references <slug>#num."""
+    dep = popt(proj, "depends_on")
+    if not dep:
+        return False
+    ref = re.compile(re.escape(repo_info(proj)[1]) + rf"#{num}\b")
+    return any(ref.search(" ".join([i["title"], i.get("body") or ""]
+                                   + [c.get("body") or "" for c in i.get("comments") or []]))
+               for i in dep_issues(repo_info(dep)[1]))
 
 
 def park_pr(state, proj, num, by_sha=False):
@@ -324,6 +355,31 @@ def overrides(proj, slug, default, mode):
             if titles:
                 rules.append("- These open PRs already implement roadmap steps and await upstream merge: "
                              "treat their steps as done and pick the next pending step.\n" + "\n".join(titles))
+    dep = popt(proj, "depends_on")
+    if dep:
+        dslug = repo_info(dep)[1]
+        what = ("If, after everything else is fixed, that dependency is the only thing failing the merge gate, "
+                "comment on the PR linking the issue and finish with marker WAITING (not BLOCKED, not FIXED): "
+                "the PR is parked until the issue closes." if mode == "review" else
+                "Still finish and open the step's PR; name the dependency issue in the PR body.")
+        rules.append(
+            f"- {slug} depends on {dslug} (project {dep}). {popt(proj, 'context', '')} "
+            f"Checks here run against {dslug}'s default branch, so work only {dslug} can do (e.g. files or "
+            f"placeholders that must exist there) cannot be fixed in this repo and is NOT a finding here. Never "
+            f"open issues about it in {slug} and never list it in follow-up issues. Instead reuse an open issue "
+            f"from `gh issue list -R {dslug} --label {DEP_LABEL} --state open` that covers it (comment "
+            f"`Also needed by {slug}#<pr>`), or create ONE: `gh label create {DEP_LABEL} -R {dslug} --color fbca04 "
+            f"--description \"Needed by a dependent repo\" 2>/dev/null; gh issue create -R {dslug} --label "
+            f"{DEP_LABEL} --title \"Needed by {slug}#<pr>: <what>\" --body ...` listing the exact paths/keys "
+            f"needed and how to verify them. {what}")
+    if mode == "implement" and dependents(proj):
+        issues = [f"  - #{i['number']} {i['title']}" for i in dep_issues(slug)]
+        if issues:
+            rules.append(
+                f"- These open {DEP_LABEL} issues block PRs in dependent repos "
+                f"({', '.join(dependents(proj))}). Do them FIRST, before any roadmap step: exactly what each "
+                f"issue asks, one PR (several issues may share one) with a `Closes #n` line per issue. Then "
+                f"continue with roadmap steps.\n" + "\n".join(issues))
     if not rules:
         return ""
     return "\nPROJECT OVERRIDES (take precedence over the task steps below)\n" + "\n".join(rules) + "\n"
@@ -376,7 +432,7 @@ def send_telegram(msg):
 
 # ---------- run claude ----------
 VALID = {"implement": {"PR_OPENED", "NO_PENDING_STEPS", "INCOMPLETE", "BLOCKED"},
-         "review": {"MERGED", "READY", "FIXED", "BLOCKED"},
+         "review": {"MERGED", "READY", "FIXED", "WAITING", "BLOCKED"},
          "roadmap": {"PR_OPENED", "NO_NEW_ITEMS", "BLOCKED"},
          "selfreview": {"REVIEW_DONE", "BLOCKED"}}
 
@@ -702,8 +758,11 @@ def _choose_work(state, args, projects, review_projects):
             if work:
                 return work
     for proj in projects:  # pass A: review open PR, else implement next step
-        _, _, default = repo_info(proj)
-        if args.mode in (None, "implement") and not exhausted(state, proj, "impl_exhausted", default) \
+        _, slug, default = repo_info(proj)
+        # open dependency issues from a dependent repo override impl_exhausted: a PR there waits on them
+        if args.mode in (None, "implement") \
+                and (not exhausted(state, proj, "impl_exhausted", default)
+                     or (dependents(proj) and dep_issues(slug))) \
                 and (args.force or not exhausted(state, proj, "human_blocked", default)):
             return proj, "implement", {}
     if args.mode in (None, "roadmap"):  # pass B: author new roadmap items (Opus, see model_by_mode)
@@ -803,6 +862,13 @@ def pick_and_run(minutes, args, u_before):
             prs.pop(key, None)
             park_pr(state, proj, extra["pr"], by_sha=True)
             notify(f"{proj} PR #{extra['pr']} ready for upstream review (not merged)")
+        elif marker == "WAITING":  # needs work in depends_on's repo: parked until its issue closes
+            if waits_on_dep(proj, extra["pr"]):  # no issue filed => keep counting toward the stuck cap
+                prs.pop(key, None)
+            sha = sh(["gh", "pr", "view", key, "-R", slug, "--json", "headRefOid", "--jq", ".headRefOid"],
+                     check=False)
+            state[proj].setdefault("waiting_prs", {})[key] = sha
+            notify(f"{proj} PR #{key} waiting on {popt(proj, 'depends_on')} ({DEP_LABEL} issue)")
         elif marker == "BLOCKED":
             park_pr(state, proj, extra["pr"])
             notify(f"{proj} PR #{extra['pr']} blocked: unfixable Medium+ finding (issue opened)", urgent=True)

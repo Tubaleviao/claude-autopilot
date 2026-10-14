@@ -18,4 +18,4 @@ STEPS
 5. If CI is green: `gh pr merge {pr} -R {slug} --squash --delete-branch`, then marker MERGED.
 
 Your final answer must include the classification table (finding | Medium+ or Low | action taken: fixed / follow-up issue / blocked) before the marker.
-Markers: MERGED | FIXED | BLOCKED
+Markers: MERGED | FIXED | WAITING | BLOCKED (WAITING only when PROJECT OVERRIDES allow it)
