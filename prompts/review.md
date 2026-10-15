@@ -4,6 +4,7 @@ This is a FRESH, independent review. Ignore anything you may infer about earlier
 SEVERITY
 - Medium+ (blocks merge): data loss, data corruption, security weakness, crash, or wrong behavior in a NORMAL use case; broken contracts; missing tests for risky logic.
 - Iteration 3 and later: Medium+ is ONLY data loss, data corruption, security weakness, crash, or wrong behavior in a normal use case. Edge cases that need hand-edited files, hostile/concurrent actors, unusual mounts or misconfiguration are Low.
+- Trust boundary (always Medium+, at every iteration): a server/host that enforces a rule only on the client, trusts client-reported state it could check itself, or accepts unvalidated network input is a security weakness, even when exploiting it needs a modified client.
 - Everything else is Low (style, hardening, rare edge cases, test hygiene, nitpicks).
 - SCOPE (always Medium+, at every iteration): if this PR implements a {roadmap} step (not a roadmap-authoring, docs or follow-up PR) and that step's section still has unchecked `- [ ]` items or unmet acceptance criteria after this PR, or the title says "partial", the step is incomplete. Fix it by implementing the remaining items of that step on this branch (skip only items that need a human, hardware or credentials; list those in the PR body), tick them in {roadmap}, and drop "(partial)" from the title (`gh pr edit {pr} -R {slug} --title ...`). A PR that ships a fraction of a step is never merged.
 
