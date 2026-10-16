@@ -43,5 +43,10 @@
       "merge": false,
       "author_roadmap": false
     }
-  }
+  },
+  "helper_model": "haiku",
+  "precheck": true,
+  "digest_summary_min_events": 6,
+  "ci_timeout_minutes": 30,
+  "ci_settle_minutes": 5
 }

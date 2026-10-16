@@ -9,6 +9,10 @@ only when the pacing policy says go. See README.md.
   --simulate "u5=60 r5=20 u7=10 r7=96"   fake usage (r5 minutes, r7 hours)
   --force --project my-project [--mode implement|review|roadmap]   skip pacing
   --burn                            no pacing: run back-to-back until a hard limit (also config "burn")
+
+Merging is the driver's job: a clean review ends CLEAN, the driver polls CI on the
+head commit (no model tokens) and merges, or sends the PR back to review with a
+Haiku summary of the failed CI logs.
 """
 import argparse, functools, itertools, hashlib, json, re, shutil, statistics, subprocess, time, urllib.error, urllib.request, uuid
 from datetime import datetime, timezone
@@ -294,8 +298,10 @@ def open_prs(proj, include_parked=False):
         return prs
     st = load_state().get(proj, {})
     parked, waiting = st.get("parked_prs", {}), st.get("waiting_prs", {})
+    ci_wait = st.get("ci_wait", {})
     return [p for p in prs if "autopilot-stuck" not in [l["name"] for l in p["labels"]]
             and parked.get(str(p["number"])) != p["headRefOid"]
+            and (ci_wait.get(str(p["number"])) or {}).get("sha") != p["headRefOid"]
             and not (waiting.get(str(p["number"])) == p["headRefOid"] and waits_on_dep(proj, p["number"]))]
 
 
@@ -384,10 +390,7 @@ def overrides(proj, slug, default, mode):
             f"- Never create issues or labels on {slug}: you do not own it. Where a step says to open an "
             f"issue, post that content as a PR comment (`gh pr comment`) instead; skip `Closes #n` lines."]
     if not popt(proj, "merge", True):
-        rules.append(
-            "- NEVER merge a PR (no `gh pr merge`): upstream maintainers merge. In review mode, when the "
-            "merge gate passes (CI green, or CI on this fork PR awaits maintainer approval and local "
-            "tests pass), finish with marker READY instead of MERGED.")
+        rules.append("- NEVER merge a PR (no `gh pr merge`): upstream maintainers merge.")
         if mode == "implement":
             titles = [f"  - #{p['number']} {p['title']}" for p in open_prs(proj, include_parked=True)]
             if titles:
@@ -396,7 +399,8 @@ def overrides(proj, slug, default, mode):
     dep = popt(proj, "depends_on")
     if dep:
         dslug = repo_info(dep)[1]
-        what = ("If, after everything else is fixed, that dependency is the only thing failing the merge gate, "
+        what = ("If, after everything else is fixed, that dependency is the only thing failing CI (see CI STATUS) "
+                "or the local checks, "
                 "comment on the PR linking the issue and finish with marker WAITING (not BLOCKED, not FIXED): "
                 "the PR is parked until the issue closes. Before finishing, close every issue in EXISTING ISSUES "
                 f"that only asks for that dependency work (`gh issue close N -R {slug} --reason \"not planned\" "
@@ -450,9 +454,14 @@ def flush_digest(force=False):
     if not force and time.time() - rows[0]["ts"] < CFG.get("digest_minutes", 60) * 60:
         return
     lines = [f"{time.strftime('%H:%M', time.localtime(r['ts']))} {r['msg']}" for r in rows]
-    if len(lines) > 40:
-        lines = lines[:15] + [f"... {len(lines) - 30} more ..."] + lines[-15:]
-    if send_telegram(f"digest ({len(rows)} events)\n" + "\n".join(lines)):
+    body = None
+    if len(rows) >= CFG.get("digest_summary_min_events", 6):  # long digest: Haiku condenses it
+        body = helper("digest", (AP / "prompts/digest.md").read_text(), "\n".join(lines))
+    if not body:
+        if len(lines) > 40:
+            lines = lines[:15] + [f"... {len(lines) - 30} more ..."] + lines[-15:]
+        body = "\n".join(lines)
+    if send_telegram(f"digest ({len(rows)} events)\n" + body[:3800]):
         DIGEST_F.unlink()
 
 
@@ -471,16 +480,199 @@ def send_telegram(msg):
         return False
 
 
+# ---------- helper model (Haiku) ----------
+HELPERS_F = AP / "helpers.jsonl"
+
+
+def helper(task, prompt, data="", timeout=180):
+    """One-shot, tool-less call on the cheap helper model; `data` goes in on stdin.
+
+    Returns the answer text, or None on any failure (callers fall back to plain Python).
+    """
+    model = CFG.get("helper_model", "haiku")
+    t0, text, cost = time.time(), None, None
+    try:
+        r = subprocess.run(["claude", "-p", prompt, "--model", model, "--output-format", "json",
+                            "--tools", "", "--no-session-persistence"],
+                           input=data, capture_output=True, text=True, timeout=timeout, cwd=AP)
+        d = json.loads(r.stdout)
+        cost = d.get("total_cost_usd")
+        if not d.get("is_error"):
+            text = (d.get("result") or "").strip() or None
+    except Exception as e:
+        log(f"helper {task} failed: {e}")
+    with HELPERS_F.open("a") as f:
+        f.write(json.dumps(dict(ts=int(time.time()), task=task, model=model, ok=text is not None,
+                                cost=cost, duration_s=round(time.time() - t0))) + "\n")
+    return text
+
+
+def has_pending_step(proj):
+    """Haiku pre-check before a Sonnet implement run. False only when the helper answers NONE."""
+    repo, _, default = repo_info(proj)
+    sh(["git", "fetch", "origin", "-q"], repo, check=False)
+    r = subprocess.run(["git", "show", f"origin/{default}:{popt(proj, 'roadmap', 'ROADMAP.md')}"],
+                       cwd=repo, capture_output=True, text=True)
+    if r.returncode or not r.stdout.strip():
+        return True  # no roadmap: let the implement run decide
+    ans = helper("precheck", (AP / "prompts/precheck.md").read_text(), r.stdout[:400_000])
+    last = [l for l in (ans or "").splitlines() if l.strip()]
+    verdict = last[-1].strip().strip("*`").upper() if last else ""
+    log(f"precheck {proj}: {verdict[:80] or 'no answer'}")
+    return not verdict.startswith("NONE")
+
+
+# ---------- CI gate (driver-side merge) ----------
+CI_OK = {"SUCCESS", "NEUTRAL", "SKIPPED"}
+
+
+def ci_status(proj, num, sha, since):
+    """('pass' | 'fail' | 'pending', failed check rows) for PR num's checks on head `sha`."""
+    _, slug, _ = repo_info(proj)
+    out = sh(["gh", "pr", "view", str(num), "-R", slug, "--json", "headRefOid,state,statusCheckRollup"],
+             check=False)
+    try:
+        d = json.loads(out)
+    except ValueError:
+        return "pending", []
+    if d.get("state") != "OPEN" or d.get("headRefOid") != sha:
+        return "gone", []
+    fork_ok = not popt(proj, "merge", True)  # upstream CI on a fork PR may await maintainer approval
+    pending, failed = False, []
+    for c in d.get("statusCheckRollup") or []:
+        if c.get("__typename") == "StatusContext":
+            st = c.get("state")
+            if st in ("PENDING", "EXPECTED"):
+                pending = True
+            elif st != "SUCCESS":
+                failed.append(dict(name=c.get("context"), url=c.get("targetUrl")))
+            continue
+        if c.get("status") != "COMPLETED":
+            pending = True
+        elif c.get("conclusion") == "ACTION_REQUIRED":
+            pending = pending or not fork_ok
+        elif c.get("conclusion") not in CI_OK:
+            failed.append(dict(name=c.get("name"), url=c.get("detailsUrl"), conclusion=c.get("conclusion")))
+    if failed:
+        return "fail", failed
+    if pending:
+        return "pending", []
+    if not d.get("statusCheckRollup"):  # nothing reported (yet): no workflows, or none triggered after a while
+        n = sh(["gh", "api", f"repos/{slug}/actions/workflows", "--jq", ".total_count"], check=False)
+        if n.strip() not in ("", "0") and time.time() - since < CFG.get("ci_settle_minutes", 5) * 60:
+            return "pending", []
+    return "pass", []
+
+
+def job_failure_log(slug, job):
+    """Annotations + the log lines leading up to the first ##[error] of one Actions job.
+
+    (`gh run view --log-failed` returns nothing on older gh versions, and a plain log
+    tail is mostly post-job cleanup.)
+    """
+    notes = sh(["gh", "api", f"repos/{slug}/check-runs/{job}/annotations", "--jq",
+                '.[] | "\\(.path):\\(.start_line) \\(.annotation_level): \\(.message)"'], check=False)
+    lines = [re.sub(r"^\d{4}-\d\d-\d\dT[\d:.]+Z ", "", l)
+             for l in sh(["gh", "api", f"repos/{slug}/actions/jobs/{job}/logs"], check=False).splitlines()]
+    errs = [i for i, l in enumerate(lines) if "##[error]" in l]
+    window = lines[max(0, errs[0] - 150):errs[0] + 5] if errs else lines[-150:]
+    extra = [lines[i] for i in errs[1:20]]
+    return "\n".join(["annotations:", notes, "log:", *window, *extra])
+
+
+def ci_failure_summary(proj, failed):
+    """Failed job logs condensed by Haiku; falls back to the raw log tail."""
+    _, slug, _ = repo_info(proj)
+    chunks = []
+    for c in failed[:4]:
+        m = re.search(r"/actions/runs/\d+/job/(\d+)", c.get("url") or "")
+        chunks.append(f"=== {c['name']} ({c.get('conclusion', 'failed')}) {c.get('url') or ''}\n"
+                      + (job_failure_log(slug, m.group(1)) if m else ""))
+    raw = "\n\n".join(chunks)[-60_000:]
+    names = ", ".join(c["name"] or "?" for c in failed)
+    summary = helper("cisummary", (AP / "prompts/cisummary.md").read_text(), raw) if raw.strip() else None
+    return f"Failed checks: {names}\n" + (summary or "\n".join(raw.splitlines()[-60:]))
+
+
+def gate_row(proj, num, marker, note=""):
+    """runs.jsonl row for a driver-side gate outcome (analyze.py counts merges from these)."""
+    with RUNS_F.open("a") as f:
+        f.write(json.dumps(dict(ts=int(time.time()), project=proj, mode="gate", marker=marker,
+                                interrupted=None, pr=num, note=note[:200], model=None, duration_s=0,
+                                cost=0, turns=0)) + "\n")
+
+
+def process_ci_waits(projects):
+    """Merge PRs whose clean review is now green on CI; send red/stuck ones back to review."""
+    state = load_state()
+    changed = False
+    for proj in projects:
+        st = state.get(proj, {})
+        for key, w in list(st.get("ci_wait", {}).items()):
+            res, failed = ci_status(proj, key, w["sha"], w["since"])
+            _, slug, default = repo_info(proj)
+            ctx = None
+            if res == "gone":  # closed, merged by hand, or new commits: nothing to gate
+                log(f"ci gate {proj} #{key}: PR closed or head moved; dropping wait")
+            elif res == "pending":
+                if time.time() - w["since"] < CFG.get("ci_timeout_minutes", 30) * 60:
+                    continue
+                ctx = (f"CI did not finish within {CFG.get('ci_timeout_minutes', 30)} minutes on {w['sha'][:10]}. "
+                       f"Check `gh pr view {key} -R {slug} --json statusCheckRollup`: fix a hanging test/workflow if "
+                       f"it is in this repo; if CI cannot finish for reasons outside this repo, finish BLOCKED.")
+                gate_row(proj, key, "CI_TIMEOUT")
+                notify(f"{proj} PR #{key}: CI still pending after {CFG.get('ci_timeout_minutes', 30)}m; back to review")
+            elif res == "fail":
+                ctx = ("CI FAILED on the head commit " + w["sha"][:10] + " (summary of the failed job logs, made by "
+                       "the driver):\n" + ci_failure_summary(proj, failed))
+                gate_row(proj, key, "CI_FAILED", ", ".join(c["name"] or "?" for c in failed))
+                notify(f"{proj} PR #{key}: CI failed; back to review")
+            elif not popt(proj, "merge", True):  # green, but upstream merges
+                st.get("prs", {}).pop(key, None)
+                park_pr(state, proj, int(key), by_sha=True)
+                gate_row(proj, key, "READY")
+                notify(f"{proj} PR #{key} ready for upstream review (not merged)")
+            else:
+                r = subprocess.run(["gh", "pr", "merge", key, "-R", slug, "--squash", "--delete-branch",
+                                    "--match-head-commit", w["sha"]],
+                                   cwd=PROJECTS_DIR, capture_output=True, text=True)
+                if r.returncode == 0:
+                    st.get("prs", {}).pop(key, None)
+                    gate_row(proj, key, "MERGED")
+                    notify(f"{proj} PR #{key} merged")
+                else:
+                    err = (r.stderr or r.stdout).strip()[:500]
+                    ctx = (f"CI is green, but the driver's `gh pr merge --squash` failed: {err}\n"
+                           f"Usually a conflict with {default}: merge origin/{default} into the branch, resolve, "
+                           f"run the tests, push, and finish FIXED.")
+                    gate_row(proj, key, "MERGE_FAILED", err)
+                    notify(f"{proj} PR #{key}: merge failed ({err[:80]}); back to review")
+            st["ci_wait"].pop(key)
+            if ctx:
+                st.setdefault("ci_context", {})[key] = dict(sha=w["sha"], text=ctx)
+            changed = True
+    if changed:
+        save_state(state)
+
+
+def ci_context_text(proj, num, sha):
+    c = load_state().get(proj, {}).get("ci_context", {}).get(str(num))
+    if c and c.get("sha") == sha:
+        return c["text"]
+    return "No CI result for this head commit yet (the driver checks CI after a CLEAN review)."
+
+
 # ---------- run claude ----------
 VALID = {"implement": {"PR_OPENED", "NO_PENDING_STEPS", "INCOMPLETE", "BLOCKED"},
-         "review": {"MERGED", "READY", "FIXED", "WAITING", "BLOCKED"},
+         # MERGED/READY: legacy, from runs that still merged themselves; no longer offered
+         "review": {"CLEAN", "MERGED", "READY", "FIXED", "WAITING", "BLOCKED"},
          "roadmap": {"PR_OPENED", "NO_NEW_ITEMS", "BLOCKED"},
          "selfreview": {"REVIEW_DONE", "BLOCKED"}}
 
 # INCOMPLETE = "the step is not finished, keep this session and resume it". It is
 # accepted from the model but never offered back to a resumed run (otherwise a
 # resume could stall forever by re-declaring itself incomplete).
-RESUME_MARKERS = {m: " | ".join(sorted(v)) for m, v in VALID.items()}
+RESUME_MARKERS = {m: " | ".join(sorted(v - {"MERGED", "READY"})) for m, v in VALID.items()}
 
 
 def parse_marker(text, mode):
@@ -547,6 +739,7 @@ def run_claude(proj, mode, minutes, extra, resume=None):
                        roadmap=popt(proj, "roadmap", "ROADMAP.md"),
                        overrides=overrides(proj, slug, default, mode),
                        existing_issues=existing_issues_rule(slug, extra["pr"]) if mode == "review" else "",
+                       ci_context=ci_context_text(proj, extra["pr"], extra.get("sha")) if mode == "review" else "",
                        branch_prefix=f"autopilot/{time.strftime('%m%d')}-{sid[:6]}",
                        minutes=int(minutes), **extra)
             prompt = ((AP / "prompts/common.md").read_text() + "\n"
@@ -719,6 +912,7 @@ def prune(dry=False):
     rewrite(AP / "logs" / "tick.log", keep_tick)
     rewrite(LOG_F, keep_jsonl)
     rewrite(RUNS_F, keep_jsonl)
+    rewrite(HELPERS_F, keep_jsonl)
     msg = f"{'would prune' if dry else 'pruned'} {files} files, {freed/1e6:.1f} MB (logs>{CFG['log_keep_days']}d, data>{CFG['data_keep_days']}d)"
     log(msg)
     return msg
@@ -833,7 +1027,7 @@ def _review_work(state, args, proj):
         save_state(state)
         notify(f"{proj} PR #{p['number']} stuck after {it-1} review iterations", urgent=True)
         return None
-    return proj, "review", dict(pr=p["number"], branch=p["headRefName"], iteration=it,
+    return proj, "review", dict(pr=p["number"], branch=p["headRefName"], sha=p["headRefOid"], iteration=it,
                                 max_iter=CFG["max_review_iterations"])
 
 
@@ -867,6 +1061,14 @@ def pick_and_run(minutes, args, u_before):
             # A whole step does not fit: the run would declare INCOMPLETE without doing anything.
             log(f"only {minutes:.0f}m budget (< min_step_minutes {floor}); no new {mode} this window")
             return False
+        if mode == "implement" and CFG.get("precheck", True) and not args.force \
+                and popt(proj, "merge", True) and not (dependents(proj) and dep_issues(repo_info(proj)[1])) \
+                and not has_pending_step(proj):
+            # Haiku read the roadmap and found no doable step: skip the Sonnet run that would say NO_PENDING_STEPS.
+            mark_exhausted(state, proj, "impl_exhausted", repo_info(proj)[2])
+            notify(f"{proj}: no pending roadmap step (Haiku pre-check); implement skipped")
+            _LAST_USAGE[0] = u_before
+            return True
     default = None if mode == "selfreview" else repo_info(proj)[2]
     slug = None if mode == "selfreview" else repo_info(proj)[1]
     if mode == "review" and not resume:  # count the iteration at launch
@@ -897,7 +1099,15 @@ def pick_and_run(minutes, args, u_before):
     elif mode == "review":
         key = str(extra["pr"])
         prs = state.setdefault(proj, {}).setdefault("prs", {})
-        if marker == "MERGED":
+        if marker == "CLEAN":  # driver waits for CI on this head, then merges (process_ci_waits)
+            sha = sh(["gh", "pr", "view", key, "-R", slug, "--json", "headRefOid", "--jq", ".headRefOid"],
+                     check=False)
+            if sha and sha == extra.get("sha"):
+                state[proj].setdefault("ci_wait", {})[key] = dict(sha=sha, since=time.time())
+                state[proj].get("ci_context", {}).pop(key, None)
+            else:  # the run pushed commits despite CLEAN: review the new head again
+                log(f"{proj} PR #{key} CLEAN but head moved ({str(extra.get('sha'))[:8]} -> {sha[:8]}); re-review")
+        elif marker == "MERGED":
             prs.pop(key, None)
             notify(f"{proj} PR #{extra['pr']} merged")
         elif marker == "READY":  # merge: false project: clean and green, left for upstream to merge
@@ -992,6 +1202,11 @@ def tick(args):
             go, mode, reason, minutes = decide(u, k)
         if not args.simulate:
             append_usage(dict(u, go=go, mode=mode, reason=(reason or "")[:100]))
+        if not (args.dry_run or args.simulate):  # merging spends no budget: gate CI on every tick
+            try:
+                process_ci_waits([args.project] if args.project else CFG["projects"])
+            except Exception as e:
+                log(f"ci gate failed: {e}")
         r5 = "none" if u["r5"] is None else f"{u['r5']:.0f}m"
         log(f"u5={u['u5']:.0f}% r5={r5} u7={u['u7']:.0f}% r7={u['r7']:.1f}h -> "
             f"{'GO' if go else 'skip'} [{mode}] {reason}")

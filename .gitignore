@@ -11,3 +11,4 @@ reports/backup-*/
 reports/stats-*.json
 config.json
 reports/
+helpers.jsonl

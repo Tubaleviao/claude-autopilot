@@ -88,15 +88,24 @@ def summarize(days=7):
     # ---- PR flow (review runs until merge) ----
     flow = {}
     for proj in {r["project"] for r in runs}:
-        seq = [r["marker"] for r in runs if r["project"] == proj and r["mode"] == "review" and not r.get("resumed")]
+        # review runs plus driver gate rows (CLEAN -> CI -> MERGED happens outside the run)
+        evs = [r for r in runs if r["project"] == proj and r["mode"] in ("review", "gate") and not r.get("resumed")]
+        seq = [r["marker"] for r in evs if r["mode"] == "review"]
+        gates = Counter(r["marker"] for r in evs if r["mode"] == "gate")
         iters, cur = [], 0
-        for mk in seq:
-            cur += 1
-            if mk == "MERGED":
+        for r in evs:
+            cur += r["mode"] == "review"
+            if r["marker"] == "MERGED":
                 iters.append(cur); cur = 0
         flow[proj] = dict(review_runs=len(seq), merges=len(iters), iterations_per_merged_pr=iters,
-                          blocked=seq.count("BLOCKED"))
+                          blocked=seq.count("BLOCKED"), gate=dict(gates))
     out["pr_flow"] = flow
+
+    # ---- helper model calls (Haiku: CI summaries, digest, implement pre-check) ----
+    hl = [r for r in load(AP / "helpers.jsonl") if r["ts"] >= since]
+    out["helpers"] = {t: dict(n=len(rs), failed=sum(1 for r in rs if not r.get("ok")),
+                              cost_usd=round(sum(r.get("cost") or 0 for r in rs), 3))
+                      for t in sorted({r["task"] for r in hl}) for rs in [[r for r in hl if r["task"] == t]]}
 
     # ---- ticks / decisions ----
     dec = Counter()
