@@ -19,6 +19,7 @@ Cron job that spends leftover Claude Code budget (5h window + weekly) on roadmap
 - **Blocked (needs a human)**: when an implement/roadmap run ends `BLOCKED` — a real blocker such as an architecture decision, missing credentials, hardware or a manual acceptance criterion — the project is **parked** in `state.json` (`human_blocked`), its pending resume is dropped, and the tick moves on to the next project instead of retrying the same step forever. The park is released automatically when `ROADMAP.md` changes (different hash: a human edited the plan), or by hand with `--unblock <project>`. `--force` ignores the park. One alert per block, not one per tick.
 - **Step floor**: no new implement/roadmap run starts with less than `min_step_minutes` (30) of budget — a whole step would not fit. Reviews and resumes still run. Branches are named by the driver: `autopilot/<MMDD>-<session6>-<slug>`.
 - **Telegram**: stuck/BLOCKED/self-review notify at once; routine events (PR opened/merged, resumes) are batched into one digest every `digest_minutes` (60; 0 = send each immediately).
+- **Starved roadmaps**: roadmap authoring normally runs only when no project has implement work. A project whose last precheck/run found no pending step (roadmap unchanged since) and that had no roadmap run for `starved_roadmap_days` (3) gets one ahead of the other projects' implement work.
 - **Streak rule**: if the last `streak_limit` (5) opened PRs were all in one project, that project is skipped for new work until another project has opened a PR (open PRs are still reviewed; falls back to it if nothing else has work). Open PRs across all projects are reviewed before new implement work.
 
 ## Usage
@@ -48,8 +49,10 @@ Autopilot never pushes weekly usage past `pace + pace_margin` (pace = linear sha
 ## CI gate (driver-side merge)
 A review run never waits for CI or merges. A clean review ends `CLEAN`; the driver records the PR head in `state.json` (`ci_wait`) and, on every tick (even when pacing says skip, since merging spends no budget), reads the PR's check rollup with `gh` — no model tokens:
 - **green** → `gh pr merge --squash --delete-branch --match-head-commit <sha>` (a `merge: false` project is parked `READY` instead). No checks reported counts as green when the repo has no workflows, or after `ci_settle_minutes` (5) when none triggered; fork CI awaiting maintainer approval counts as green for `merge: false`.
+- **red only on jobs the default branch also fails** (latest completed push run per workflow) → the PR keeps waiting (one `WAITING` gate row, no review run). Once the default branch is green, it goes back to review with a note to merge the default branch in first.
 - **red** → the failed job logs (annotations + lines before the first `##[error]`) are condensed by Haiku and stored (`ci_context`); the PR goes back to review, whose prompt shows the summary under CI STATUS as a Medium+ finding.
 - **still pending after `ci_timeout_minutes` (30)** or **merge failed** (conflict) → back to review with that note.
+- **Default branch red for `main_red_fix_hours` (2)** (tracked as `main_red` in `state.json`) → the next implement prompt for that project says to fix it first in a PR titled `Fix <default> CI: ...`, with Haiku's summary of the failing jobs. This overrides `impl_exhausted` and the precheck, and stops once such a PR is open.
 - New commits on the PR drop the wait. A PR waiting on CI is not reviewed. Gate outcomes go to `runs.jsonl` as `mode: "gate"` rows (`MERGED`, `READY`, `CI_FAILED`, `CI_TIMEOUT`, `MERGE_FAILED`).
 
 ## Models

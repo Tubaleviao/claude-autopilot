@@ -425,6 +425,14 @@ def overrides(proj, slug, default, mode):
                 f"({', '.join(dependents(proj))}). Do them FIRST, before any roadmap step: exactly what each "
                 f"issue asks, one PR (several issues may share one) with a `Closes #n` line per issue. Then "
                 f"continue with roadmap steps.\n" + "\n".join(issues))
+    red = main_fix_due(load_state(), proj) if mode == "implement" else None
+    if red:
+        hours = (time.time() - red["since"]) / 3600
+        rules.append(
+            f"- CI on {default} has been red for {hours:.0f} h (failing: {', '.join(red['names'])}), and open PRs "
+            f"keep failing on it. Fix it FIRST, before any roadmap step: one branch from origin/{default} and one PR "
+            f"titled \"Fix {default} CI: <cause>\" that makes those jobs pass. Then continue with roadmap steps. "
+            f"Driver's summary of the failed {default} jobs:\n" + ci_failure_summary(proj, red["jobs"]))
     if not rules:
         return ""
     return "\nPROJECT OVERRIDES (take precedence over the task steps below)\n" + "\n".join(rules) + "\n"
@@ -594,6 +602,68 @@ def ci_failure_summary(proj, failed):
     return f"Failed checks: {names}\n" + (summary or "\n".join(raw.splitlines()[-60:]))
 
 
+_MAIN_CI = {}  # proj -> (fetched_at, result): a burn loop calls this every few minutes
+
+
+def main_ci(proj):
+    """Failed jobs ([{name, url}], [] when green) of the latest completed push run of each workflow
+    on the default branch; None when gh fails (callers keep what they knew)."""
+    hit = _MAIN_CI.get(proj)
+    if hit and time.time() - hit[0] < 300:
+        return hit[1]
+    _, slug, default = repo_info(proj)
+    try:
+        runs = json.loads(sh(["gh", "run", "list", "-R", slug, "--branch", default, "--event", "push",
+                              "--status", "completed", "--limit", "30",
+                              "--json", "databaseId,workflowName,conclusion"]))
+        latest = {}
+        for r in runs:  # newest first
+            latest.setdefault(r["workflowName"], r)
+        failed = []
+        for r in latest.values():
+            if r["conclusion"] in ("success", "skipped", "neutral", "cancelled"):
+                continue
+            jobs = json.loads(sh(["gh", "run", "view", str(r["databaseId"]), "-R", slug, "--json", "jobs"]))
+            failed += [dict(name=j["name"], url=j.get("url")) for j in jobs.get("jobs", [])
+                       if j.get("conclusion") in ("failure", "timed_out")]
+    except (RuntimeError, ValueError, KeyError) as e:
+        log(f"main CI check {proj} failed: {e}")
+        return None
+    _MAIN_CI[proj] = (time.time(), failed)
+    return failed
+
+
+def track_main_ci(st, proj):
+    """Keep st["main_red"] = {since, jobs} while the default branch's CI is red."""
+    failed = main_ci(proj)
+    if failed is None:
+        return False
+    old = st.get("main_red")
+    if not failed:
+        if old:
+            st.pop("main_red")
+            log(f"{proj}: {repo_info(proj)[2]} CI green again")
+        return bool(old)
+    names = sorted({j["name"] for j in failed})
+    if old and old["names"] == names:
+        return False
+    st["main_red"] = dict(since=old["since"] if old else time.time(), names=names, jobs=failed)
+    log(f"{proj}: {repo_info(proj)[2]} CI red: {', '.join(names)}")
+    return True
+
+
+def main_fix_due(state, proj):
+    """The main_red record once the default branch has been red for main_red_fix_hours, unless an
+    open autopilot PR already fixes it; else None."""
+    red = state.get(proj, {}).get("main_red")
+    if not red or time.time() - red["since"] < CFG.get("main_red_fix_hours", 2) * 3600:
+        return None
+    default = repo_info(proj)[2]
+    if any(p["title"].lower().startswith(f"fix {default} ci") for p in open_prs(proj, include_parked=True)):
+        return None
+    return red
+
+
 def gate_row(proj, num, marker, note=""):
     """runs.jsonl row for a driver-side gate outcome (analyze.py counts merges from these)."""
     with RUNS_F.open("a") as f:
@@ -607,11 +677,22 @@ def process_ci_waits(projects):
     state = load_state()
     changed = False
     for proj in projects:
-        st = state.get(proj, {})
+        st = state.setdefault(proj, {})
+        changed |= track_main_ci(st, proj)
+        main_bad = set((st.get("main_red") or {}).get("names", []))
         for key, w in list(st.get("ci_wait", {}).items()):
             res, failed = ci_status(proj, key, w["sha"], w["since"])
             _, slug, default = repo_info(proj)
             ctx = None
+            if res == "fail" and {c["name"] for c in failed} <= main_bad:
+                # main fails the same jobs: a review run would only fix main's breakage inside this PR.
+                # Keep waiting; once main is green the PR goes back to review to merge it in.
+                if not w.get("main_red"):
+                    w["main_red"] = sorted({c["name"] for c in failed})
+                    gate_row(proj, key, "WAITING", "main also red: " + ", ".join(w["main_red"]))
+                    notify(f"{proj} PR #{key}: CI fails only where {default} also fails; waiting for {default}")
+                    changed = True
+                continue
             if res == "gone":  # closed, merged by hand, or new commits: nothing to gate
                 log(f"ci gate {proj} #{key}: PR closed or head moved; dropping wait")
             elif res == "pending":
@@ -625,6 +706,10 @@ def process_ci_waits(projects):
             elif res == "fail":
                 ctx = ("CI FAILED on the head commit " + w["sha"][:10] + " (summary of the failed job logs, made by "
                        "the driver):\n" + ci_failure_summary(proj, failed))
+                if w.get("main_red"):
+                    ctx = (f"While this PR waited, {default} itself failed CI ({', '.join(w['main_red'])}); {default} "
+                           f"has changed since. First merge origin/{default} into the branch and push so CI re-runs; "
+                           f"fix only what still fails after that.\n" + ctx)
                 gate_row(proj, key, "CI_FAILED", ", ".join(c["name"] or "?" for c in failed))
                 notify(f"{proj} PR #{key}: CI failed; back to review")
             elif not popt(proj, "merge", True):  # green, but upstream merges
@@ -704,7 +789,7 @@ BOUNDS = {"tail_minutes": (30, 150), "pace_margin": (2, 8), "default_k": (0.05, 
 RESUME_PROMPT = """Your previous autopilot run on this task was interrupted ({reason}) before finishing.
 RESUME it now: first check the real state (`git status`, `git log --oneline -5`, current branch, open PR),
 then continue exactly where you left off, with the same task and the same hard rules.
-You have roughly {minutes} more minutes. Finish with one status marker as the LAST line: {markers}."""
+You have roughly {minutes} more minutes (deadline {deadline}; check with `date -u`). Finish with one status marker as the LAST line: {markers}."""
 
 
 def model_for(mode):
@@ -718,10 +803,11 @@ def run_claude(proj, mode, minutes, extra, resume=None):
         slug = default = None
     else:
         repo, slug, default = repo_info(proj)
+    deadline = time.strftime("%H:%M UTC", time.gmtime(time.time() + minutes * 60))
     if resume:
         wt = AP if selfrev else AP / "worktrees" / proj  # keep uncommitted work: no reset
         sid = resume["session_id"]
-        prompt = RESUME_PROMPT.format(reason=resume["reason"], minutes=int(minutes),
+        prompt = RESUME_PROMPT.format(reason=resume["reason"], minutes=int(minutes), deadline=deadline,
                                       markers=RESUME_MARKERS[mode])
         sess = ["--resume", sid]
     else:
@@ -741,7 +827,7 @@ def run_claude(proj, mode, minutes, extra, resume=None):
                        existing_issues=existing_issues_rule(slug, extra["pr"]) if mode == "review" else "",
                        ci_context=ci_context_text(proj, extra["pr"], extra.get("sha")) if mode == "review" else "",
                        branch_prefix=f"autopilot/{time.strftime('%m%d')}-{sid[:6]}",
-                       minutes=int(minutes), **extra)
+                       minutes=int(minutes), deadline=deadline, **extra)
             prompt = ((AP / "prompts/common.md").read_text() + "\n"
                       + (AP / f"prompts/{mode}.md").read_text()).format(**ctx)
     model = model_for(mode)
@@ -993,12 +1079,19 @@ def _choose_work(state, args, projects, review_projects):
             work = _review_work(state, args, proj)
             if work:
                 return work
+    if not args.mode:  # pass A1: a starved project gets roadmap authoring ahead of others' implement work
+        for proj in projects:
+            if starved_for_roadmap(state, args, proj):
+                log(f"{proj}: no pending steps and no roadmap run in {CFG.get('starved_roadmap_days', 3)}d; "
+                    f"authoring roadmap ahead of other projects")
+                return proj, "roadmap", {}
     for proj in projects:  # pass A: review open PR, else implement next step
         _, slug, default = repo_info(proj)
-        # open dependency issues from a dependent repo override impl_exhausted: a PR there waits on them
+        # open dependency issues from a dependent repo, or a long-red default branch, override
+        # impl_exhausted: PRs wait on them
         if args.mode in (None, "implement") \
                 and (not exhausted(state, proj, "impl_exhausted", default)
-                     or (dependents(proj) and dep_issues(slug))) \
+                     or (dependents(proj) and dep_issues(slug)) or main_fix_due(state, proj)) \
                 and (args.force or not exhausted(state, proj, "human_blocked", default)):
             return proj, "implement", {}
     if args.mode in (None, "roadmap"):  # pass B: author new roadmap items (Opus, see model_by_mode)
@@ -1009,6 +1102,23 @@ def _choose_work(state, args, projects, review_projects):
                     and (args.force or not exhausted(state, proj, "human_blocked", default)):
                 return proj, "roadmap", {}
     return None
+
+
+def starved_for_roadmap(state, args, proj):
+    """Pass B only runs when no project has implement work, so a project out of steps never gets new
+    ones while another always has some. True when its last precheck/run found no pending step and
+    the roadmap is unchanged since (the impl_exhausted record may have expired: nothing re-checks
+    it while other projects win pass A), and it had no roadmap run for starved_roadmap_days."""
+    _, _, default = repo_info(proj)
+    e = state.get(proj, {}).get("impl_exhausted")
+    if not e or e.get("hash") != roadmap_hash(proj, default) or not popt(proj, "author_roadmap", True) \
+            or exhausted(state, proj, "roadmap_exhausted", default) \
+            or (not args.force and exhausted(state, proj, "human_blocked", default)):
+        return False
+    since = time.time() - CFG.get("starved_roadmap_days", 3) * 86400
+    rows = [json.loads(l) for l in RUNS_F.read_text().splitlines() if l.strip()] if RUNS_F.exists() else []
+    return not any(r.get("project") == proj and r.get("mode") == "roadmap" and r.get("ts", 0) > since
+                   for r in rows)
 
 
 def _review_work(state, args, proj):
@@ -1063,7 +1173,7 @@ def pick_and_run(minutes, args, u_before):
             return False
         if mode == "implement" and CFG.get("precheck", True) and not args.force \
                 and popt(proj, "merge", True) and not (dependents(proj) and dep_issues(repo_info(proj)[1])) \
-                and not has_pending_step(proj):
+                and not main_fix_due(state, proj) and not has_pending_step(proj):
             # Haiku read the roadmap and found no doable step: skip the Sonnet run that would say NO_PENDING_STEPS.
             mark_exhausted(state, proj, "impl_exhausted", repo_info(proj)[2])
             notify(f"{proj}: no pending roadmap step (Haiku pre-check); implement skipped")

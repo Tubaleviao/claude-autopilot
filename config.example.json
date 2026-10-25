@@ -48,5 +48,7 @@
   "precheck": true,
   "digest_summary_min_events": 6,
   "ci_timeout_minutes": 30,
-  "ci_settle_minutes": 5
+  "ci_settle_minutes": 5,
+  "main_red_fix_hours": 2,
+  "starved_roadmap_days": 3
 }
