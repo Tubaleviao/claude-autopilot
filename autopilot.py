@@ -376,6 +376,11 @@ def park_pr(state, proj, num, by_sha=False):
         sh(["gh", "pr", "edit", str(num), "-R", slug, "--add-label", "autopilot-stuck"], check=False)
 
 
+def in_flight_prs(proj):
+    """`  - #n title` per open PR of ours, parked and CI-waiting ones included."""
+    return [f"  - #{p['number']} {p['title']}" for p in open_prs(proj, include_parked=True)]
+
+
 def overrides(proj, slug, default, mode):
     """Prompt rules for projects that push to a fork and/or must not merge (config project_opts)."""
     rules, push = [], popt(proj, "push_remote")
@@ -389,13 +394,18 @@ def overrides(proj, slug, default, mode):
             f"- Open PRs with `gh pr create -R {slug} --base {default} --head {owner}:<branch> ...`.",
             f"- Never create issues or labels on {slug}: you do not own it. Where a step says to open an "
             f"issue, post that content as a PR comment (`gh pr comment`) instead; skip `Closes #n` lines."]
-    if not popt(proj, "merge", True):
+    merges = popt(proj, "merge", True)
+    if not merges:
         rules.append("- NEVER merge a PR (no `gh pr merge`): upstream maintainers merge.")
-        if mode == "implement":
-            titles = [f"  - #{p['number']} {p['title']}" for p in open_prs(proj, include_parked=True)]
-            if titles:
-                rules.append("- These open PRs already implement roadmap steps and await upstream merge: "
-                             "treat their steps as done and pick the next pending step.\n" + "\n".join(titles))
+    if mode == "implement":
+        # Every open PR, parked or waiting on CI included: open_prs() hides those from review, so
+        # without this list an implement run re-does a step whose PR is just waiting to merge.
+        titles = in_flight_prs(proj)
+        if titles:
+            why = "await upstream merge" if not merges else "are open (in review, parked or waiting on CI)"
+            rules.append(f"- These open PRs already implement roadmap steps and {why}: treat their steps "
+                         "as done and pick the next pending step. Never open a second PR for the same "
+                         "step.\n" + "\n".join(titles))
     dep = popt(proj, "depends_on")
     if dep:
         dslug = repo_info(dep)[1]
@@ -523,7 +533,11 @@ def has_pending_step(proj):
                        cwd=repo, capture_output=True, text=True)
     if r.returncode or not r.stdout.strip():
         return True  # no roadmap: let the implement run decide
-    ans = helper("precheck", (AP / "prompts/precheck.md").read_text(), r.stdout[:400_000])
+    data = r.stdout[:400_000]
+    titles = in_flight_prs(proj)
+    if titles:
+        data += "\n\n--- OPEN PULL REQUESTS (their steps count as done) ---\n" + "\n".join(titles) + "\n"
+    ans = helper("precheck", (AP / "prompts/precheck.md").read_text(), data)
     last = [l for l in (ans or "").splitlines() if l.strip()]
     verdict = last[-1].strip().strip("*`").upper() if last else ""
     log(f"precheck {proj}: {verdict[:80] or 'no answer'}")
