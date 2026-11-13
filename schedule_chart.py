@@ -20,7 +20,7 @@ def simulate(k, rate):
     u5 = u7 = 0.0
     win_end = None
     run_left, nxt, mode = 0, 0, None
-    active, u7s, windows = [0] * WEEK, [], []
+    active, u7s, u5s, windows = [0] * WEEK, [], [], []
     for t in range(WEEK):
         if win_end is not None and t >= win_end:
             win_end, u5 = None, 0.0
@@ -46,89 +46,99 @@ def simulate(k, rate):
                 if run_left <= 0:
                     nxt = t
         u7s.append(u7)
-    return active, u7s, windows
+        u5s.append(u5)
+    return active, u7s, u5s, windows
 
 
-# light-only palette: the SVG paints its own surface, so it reads the same on GitHub light and dark
-SURF, INK, INK2, MUTED, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#8a8984", "#e4e3df"
-EMPTY = "#efeeea"
-RAMP = ["#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95"]
-PACE = "#8a8984"
-
-
-def cell_color(minutes):
-    if minutes == 0:
-        return EMPTY
-    return RAMP[min(len(RAMP) - 1, int(minutes / 60 * len(RAMP)))]
+# dark palette: the SVG paints its own surface, so it reads the same on GitHub light and dark
+SURF, INK, INK2, MUTED, GRID = "#1a1a19", "#f0efec", "#c3c2b7", "#8f8e88", "#33322f"
+TRACK, WIN_FILL, WIN_LINE = "#2a2927", "#262f3b", "#4a6a93"
+RUN, PACE = "#3987e5", "#8f8e88"
 
 
 def esc(s):
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def render(active, u7s, windows, k, rate):
-    W, H = 920, 670
+def render(active, u7s, u5s, windows, k, rate):
+    W, H = 960, 760
     o = []
     t = lambda x, y, s, size=12, fill=INK2, anchor="start", weight=400: o.append(
-        f'<text x="{x}" y="{y}" font-size="{size}" fill="{fill}" text-anchor="{anchor}" '
+        f'<text x="{x:.1f}" y="{y:.1f}" font-size="{size}" fill="{fill}" text-anchor="{anchor}" '
         f'font-weight="{weight}">{esc(s)}</text>')
+    rect = lambda x, y, w, h, fill, rx=3, extra="": o.append(
+        f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" rx="{rx}" fill="{fill}" {extra}/>')
     o.append(f'<rect width="{W}" height="{H}" rx="12" fill="{SURF}"/>')
     t(32, 40, "Autopilot over one week when you don't use Claude yourself", 18, INK, weight=600)
-    t(32, 62, f"Simulated with the real decide() policy · learned k = {k:.2f} weekly % per 1% of the 5h "
-              f"window · {rate:.2f}% of the window per run-minute", 12, MUTED)
+    t(32, 62, f"Simulated with the real decide() policy · k = {k:.2f} weekly % per 1% of a 5h window "
+              f"· {rate:.2f}% of the window per run-minute", 12, MUTED)
 
-    # ---- heatmap: day of the limit period x hour since the weekly reset
-    x0, y0, cw, ch, gap = 96, 128, 26, 26, 2
-    t(32, 96, "Minutes of autopilot work per hour", 13, INK, weight=600)
-    for h in range(0, 24, 3):
-        t(x0 + h * cw + cw / 2, y0 - 6, f"+{h}h", 10, MUTED, "middle")
-    sx = x0 + 24 * cw + 18
-    t(sx, y0 - 6, "work", 10, MUTED)
-    t(sx + 64, y0 - 6, "weekly used", 10, MUTED)
+    # ---- timeline: one row per day of the weekly limit period, 5h windows as boxes, runs as bars
+    x0, y0, cw, rh, rg = 96, 132, 26, 34, 12
+    t(32, 96, "When autopilot runs, inside the 5h windows it opens", 13, INK, weight=600)
+    for h in range(0, 25, 3):
+        xx = x0 + h * cw
+        t(xx, y0 - 10, f"+{h}h", 10, MUTED, "middle")
+        o.append(f'<line x1="{xx}" x2="{xx}" y1="{y0 - 4}" y2="{y0 + 7 * (rh + rg) - rg}" stroke="{GRID}" stroke-width="1"/>')
+    sx = x0 + 24 * cw + 22
+    t(sx, y0 - 10, "work", 10, MUTED)
+    t(sx + 58, y0 - 10, "weekly +", 10, MUTED)
+    t(sx + 122, y0 - 10, "weekly total", 10, MUTED)
+    X = lambda m, d: x0 + (m - d * DAY) / 60 * cw
     for d in range(7):
-        y = y0 + d * (ch + 8)
-        t(32, y + ch / 2 + 4, f"Day {d + 1}", 12, INK2)
-        for h in range(24):
-            m = sum(active[d * DAY + h * 60:d * DAY + (h + 1) * 60])
-            o.append(f'<rect x="{x0 + h * cw + gap / 2}" y="{y}" width="{cw - gap}" height="{ch}" rx="3" '
-                     f'fill="{cell_color(m)}"><title>Day {d + 1}, +{h}h: {m} min</title></rect>')
-        # 5h windows opened by autopilot, as a thin bracket under the row
+        y = y0 + d * (rh + rg)
+        t(32, y + rh / 2 + 4, f"Day {d + 1}", 12, INK2)
+        rect(x0, y + rh / 2 - 1, 24 * cw, 2, TRACK, 1)
         for w in windows:
-            s, e = max(w, d * DAY), min(w + a.WINDOW_MIN, (d + 1) * DAY)
-            if s < e:
-                xa, xb = x0 + (s - d * DAY) / 60 * cw, x0 + (e - d * DAY) / 60 * cw
-                o.append(f'<rect x="{xa + 1}" y="{y + ch + 2}" width="{xb - xa - 2}" height="3" rx="1.5" fill="{MUTED}"/>')
+            we = w + int(a.WINDOW_MIN)
+            s_, e_ = max(w, d * DAY), min(we, (d + 1) * DAY)
+            if s_ >= e_:
+                continue
+            xa, xb = X(s_, d), X(e_, d)
+            rect(xa + 1, y, xb - xa - 2, rh, WIN_FILL, 5, f'stroke="{WIN_LINE}" stroke-width="1"')
+            peak = max(u5s[w:min(we, WEEK)])
+            # label once, on the part of a split window that is wide enough
+            if xb - xa >= 64 and (s_ == w or min(we, (d + 1) * DAY) - max(w, d * DAY) > (we - w) / 2):
+                t(xa + 6, y + 11, f"5h window · {peak:.0f}%", 9, INK2)
+        m = d * DAY
+        while m < (d + 1) * DAY:  # run segments
+            if active[m]:
+                e = m
+                while e < (d + 1) * DAY and active[e]:
+                    e += 1
+                rect(X(m, d), y + 16, max(2, X(e, d) - X(m, d)), 12, RUN, 2)
+                m = e
+            else:
+                m += 1
         hrs = sum(active[d * DAY:(d + 1) * DAY]) / 60
-        t(sx, y + ch / 2 + 4, f"{hrs:.1f} h", 12, INK, weight=600)
-        t(sx + 64, y + ch / 2 + 4, f"{min(100, u7s[(d + 1) * DAY - 1]):.0f}%", 12, INK2)
+        prev = u7s[d * DAY - 1] if d else 0
+        cur = min(100, u7s[(d + 1) * DAY - 1])
+        t(sx, y + rh / 2 + 4, f"{hrs:.1f} h", 12, INK, weight=600)
+        t(sx + 58, y + rh / 2 + 4, f"+{cur - min(100, prev):.0f}%", 12, INK2)
+        t(sx + 122, y + rh / 2 + 4, f"{cur:.0f}%", 12, INK2)
 
-    # legend
-    ly = y0 + 7 * (ch + 8) + 14
-    t(x0, ly + 11, "0 min", 10, MUTED, "end")
-    o.append(f'<rect x="{x0 + 6}" y="{ly}" width="14" height="14" rx="3" fill="{EMPTY}"/>')
-    for i, c in enumerate(RAMP):
-        o.append(f'<rect x="{x0 + 24 + i * 18}" y="{ly}" width="16" height="14" rx="3" fill="{c}"/>')
-    t(x0 + 24 + len(RAMP) * 18 + 4, ly + 11, "60 min", 10, MUTED)
-    o.append(f'<rect x="{x0 + 200}" y="{ly + 5}" width="30" height="3" rx="1.5" fill="{MUTED}"/>')
-    t(x0 + 236, ly + 11, "5h window opened by autopilot", 10, MUTED)
+    ly = y0 + 7 * (rh + rg) + 4
+    rect(x0, ly, 34, 16, WIN_FILL, 4, f'stroke="{WIN_LINE}" stroke-width="1"')
+    t(x0 + 42, ly + 12, "5h usage window (label: how full it got)", 11, INK2)
+    rect(x0 + 300, ly + 3, 34, 10, RUN, 2)
+    t(x0 + 342, ly + 12, "autopilot running", 11, INK2)
 
     # ---- weekly usage vs linear pace
-    py0, ph, px0, pw = ly + 70, 150, x0, 24 * cw
+    py0, ph, px0, pw = ly + 80, 150, x0, 24 * cw
     t(32, py0 - 22, "Weekly usage across the period", 13, INK, weight=600)
     for v in (0, 50, 100):
         yy = py0 + ph - v / 100 * ph
         o.append(f'<line x1="{px0}" x2="{px0 + pw}" y1="{yy}" y2="{yy}" stroke="{GRID}" stroke-width="1"/>')
         t(px0 - 8, yy + 4, f"{v}%", 10, MUTED, "end")
     for d in range(8):
-        xx = px0 + d / 7 * pw
-        t(xx, py0 + ph + 16, f"Day {d + 1}" if d < 7 else "reset", 10, MUTED, "middle")
+        t(px0 + d / 7 * pw, py0 + ph + 16, f"Day {d + 1}" if d < 7 else "reset", 10, MUTED, "middle")
     o.append(f'<line x1="{px0}" y1="{py0 + ph}" x2="{px0 + pw}" y2="{py0}" stroke="{PACE}" '
              f'stroke-width="2" stroke-dasharray="5 4"/>')
     pts = " ".join(f"{px0 + i / WEEK * pw:.1f},{py0 + ph - min(100, u7s[i]) / 100 * ph:.1f}"
                    for i in range(0, WEEK, 30))
-    o.append(f'<polyline points="{pts}" fill="none" stroke="{RAMP[4]}" stroke-width="2" stroke-linejoin="round"/>')
+    o.append(f'<polyline points="{pts}" fill="none" stroke="{RUN}" stroke-width="2" stroke-linejoin="round"/>')
     lx = px0 + 260
-    o.append(f'<line x1="{lx}" x2="{lx + 24}" y1="{py0 - 26}" y2="{py0 - 26}" stroke="{RAMP[4]}" stroke-width="2"/>')
+    o.append(f'<line x1="{lx}" x2="{lx + 24}" y1="{py0 - 26}" y2="{py0 - 26}" stroke="{RUN}" stroke-width="2"/>')
     t(lx + 30, py0 - 22, "weekly % used by autopilot", 11, INK2)
     o.append(f'<line x1="{lx + 210}" x2="{lx + 234}" y1="{py0 - 26}" y2="{py0 - 26}" '
              f'stroke="{PACE}" stroke-width="2" stroke-dasharray="5 4"/>')
@@ -150,10 +160,10 @@ def main():
     p.add_argument("--out", default=str(Path(__file__).parent / "docs" / "weekly-schedule.svg"))
     args = p.parse_args()
     k = args.k if args.k is not None else a.learn_k()
-    active, u7s, windows = simulate(k, args.rate)
+    active, u7s, u5s, windows = simulate(k, args.rate)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(render(active, u7s, windows, k, args.rate))
+    out.write_text(render(active, u7s, u5s, windows, k, args.rate))
     print(f"{out}: {sum(active) / 60:.1f} h active, {len(windows)} windows, weekly {u7s[-1]:.0f}%")
 
 
