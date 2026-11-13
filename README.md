@@ -1,77 +1,66 @@
 # claude-autopilot
 
-Cron job that spends leftover Claude Code budget (5h window + weekly) on roadmap work.
+Cron job that spends leftover Claude Code budget on roadmap work: each tick reads usage, decides whether to run, picks a project and runs `claude -p` in a git worktree.
 
-- `autopilot.py` – tick: usage API → pacing policy → pick project → `claude -p` in a git worktree
-- `config.example.json` – project priority, thresholds, model. Copy to `config.json` (gitignored) and edit; `projects_dir` accepts `~`
-- `prompts/` – implement / review / roadmap prompts (+ common guardrails)
-- Local (gitignored): `config.json`, `reports/`, `logs/`, `worktrees/`, `state.json`, `usage-log.jsonl`, `helpers.jsonl`, `PAUSE`
+- `autopilot.py` – the tick · `analyze.py` – stats · `schedule_chart.py` – redraws the chart below · `prompts/` – run prompts
+- `config.example.json` → copy to `config.json` (gitignored) and edit. Also local: `reports/`, `logs/`, `worktrees/`, `state.json`, `*.jsonl`, `PAUSE`
 
-## Policy
-- **TAIL** (default): run only in last `tail_minutes` of the 5h window (window start stays free for you), if weekly usage isn't ahead of linear pace.
-- **BURN** (`"burn": true` in config.json or `--burn`): spend as fast as possible. Ignores tail, pace line, weekly cap and window-end clamp; runs back-to-back with no `max_runs_per_tick` limit until `max_u5`/`max_u7` is hit, nothing is left to do, or a run fails instantly. Cron restarts it every 10 min, and a burn loop exits before its next run once `autopilot.py` or `config.json` changes, so edits take effect within a tick; a run cut off by the 5h limit is resumed after reset. Leaves no headroom for interactive use.
-- **SATURATE**: if filling every remaining window barely reaches 100% weekly (learned `k`), run anytime, even opening a new window.
-- **Intra-window pace line**: inside a live window the autopilot may only reach `100 * elapsed_share + u5_pace_margin`% (`u5_pace_margin`, default 15), so it drains leftover budget across the whole window instead of one burst — the rest stays free for you. SATURATE is exempt.
-- Per project (priority order): open `autopilot/*` PR → review+fix until no Medium+ (`CLEAN`) → the driver waits for CI and squash-merges (see **CI gate**); else implement the next pending roadmap step **in full** (a step = a whole roadmap section/phase, all its deliverables and acceptance criteria — never a single checklist line, never a "(partial)" PR). While budget remains after a step's PR the run takes the next step (its own branch and PR); a step it cannot finish ends with `INCOMPLETE` and is resumed next run in the same worktree. All exhausted → author 3-6 new feature-sized roadmap steps from deferred steps, open GitHub issues and brainstorming. Review leftovers (`autopilot-followup` issues, one per PR with only Low findings) are never a step on their own: they are folded into a feature step touching the same code, or clustered by area into **sweep** steps that each close 4-12 issues in one PR (at most half the batch, max 3 sweeps per batch).
-- **Per-project options** (`project_opts` in config.json, keyed by project): `roadmap` – roadmap path (default `ROADMAP.md`); `push_remote` – contribute from a fork: base branches on `origin/<default>` (upstream), push to this remote, open cross-repo PRs (`--head <owner>:<branch>`), never create issues/labels upstream; `merge: false` – never merge: a clean, green review ends `READY` and the PR is parked by head SHA (new commits re-enable review), and implement treats steps of open PRs as done; `author_roadmap: false` – skip roadmap-authoring mode. `depends_on: "<project>"` (+ optional `context` text for the prompts) – this repo's checks need work in another configured project (e.g. assets repo needing public placeholders in the game repo): runs file one `autopilot-dependency` issue in that project instead of local blocker issues, a review ends `WAITING` and the PR is parked until that issue closes (or the head SHA changes), and the other project's implement runs do open `autopilot-dependency` issues before roadmap steps, even when its roadmap is exhausted. The WAITING review also closes this repo's issues that only asked for that dependency work.
-- **Issue reuse**: each review prompt lists the open issues autopilot already filed that mention the PR. The run updates the newest `Follow-ups from PR #N review` issue instead of opening another, reuses existing blocker issues, and merges and closes duplicates left by earlier rounds.
-- **Trust boundary**: only PRs authored by the `gh` user from a same-repo branch are reviewed/merged (fork PRs named `autopilot/*` are ignored); for a `push_remote` project, only cross-repo PRs whose head is the `gh` user's fork. Roadmap mode reads only issues by `@me`. Review treats a PR shipping part of a roadmap step as Medium+ and completes the step before merging.
-- **Blocked (needs a human)**: when an implement/roadmap run ends `BLOCKED` — a real blocker such as an architecture decision, missing credentials, hardware or a manual acceptance criterion — the project is **parked** in `state.json` (`human_blocked`), its pending resume is dropped, and the tick moves on to the next project instead of retrying the same step forever. The park is released automatically when `ROADMAP.md` changes (different hash: a human edited the plan), or by hand with `--unblock <project>`. `--force` ignores the park. One alert per block, not one per tick.
-- **Step floor**: no new implement/roadmap run starts with less than `min_step_minutes` (30) of budget — a whole step would not fit. Reviews and resumes still run. Branches are named by the driver: `autopilot/<MMDD>-<session6>-<slug>`.
-- **Telegram**: stuck/BLOCKED/self-review notify at once; routine events (PR opened/merged, resumes) are batched into one digest every `digest_minutes` (60; 0 = send each immediately).
-- **Starved roadmaps**: roadmap authoring normally runs only when no project has implement work. A project whose last precheck/run found no pending step (roadmap unchanged since) and that had no roadmap run for `starved_roadmap_days` (3) gets one ahead of the other projects' implement work.
-- **Streak rule**: if the last `streak_limit` (5) opened PRs were all in one project, that project is skipped for new work until another project has opened a PR (open PRs are still reviewed; falls back to it if nothing else has work). Open PRs across all projects are reviewed before new implement work.
-
-## Usage
-    python3 autopilot.py --dry-run
+## Setup
+    python3 autopilot.py --dry-run                      # show the decision
     python3 autopilot.py --simulate "u5=60 r5=20 u7=10 r7=96" --dry-run
-    python3 autopilot.py --burn --dry-run   # burn mode decision
     python3 autopilot.py --force --project my-project --mode implement
-    python3 autopilot.py --unblock project-nihon   # release a BLOCKED park
-    touch PAUSE   # disable;  rm PAUSE to resume
+    python3 autopilot.py --unblock my-project           # release a BLOCKED park
+    touch PAUSE                                         # disable (rm to resume)
 
-Needs `gh` authenticated. Cron line:
+Needs `gh` authenticated. Cron:
 
     */10 * * * * PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin HOME=$HOME flock -n /path/to/claude-autopilot/lock python3 /path/to/claude-autopilot/autopilot.py >> /path/to/claude-autopilot/logs/tick.log 2>&1
 
-## Pacing (ramp)
+## Claude usage limits
+Two limits apply at once:
+- **5h window** (`u5`): starts with the first message sent while no window is open and lasts 5 hours, then resets to 0. Windows are not fixed slots: nothing runs until someone (you or autopilot) sends a message.
+- **Weekly** (`u7`): one budget per 7 days, reset at a fixed time. Each 5h window spends only part of it (`k` = weekly % per 1% of a window, learned from `usage-log.jsonl`).
+
+## When it runs
 ![Autopilot schedule over one week with no manual usage](docs/weekly-schedule.svg)
 
-What a week looks like if you never use Claude yourself. Top: one row per day after the weekly reset; each box is a 5h usage window autopilot opened (label: how full it got), blue bars are runs. It opens a window roughly every 15 h, once weekly usage falls behind the linear pace line, does a short burst up to the intra-window pace line, then fills the window's tail: about 4 h of work a day, and the weekly total stays on the pace line until it reaches ~100% at the reset (bottom). When you use Claude yourself, your usage opens the windows and raises weekly %, so autopilot only takes each window's tail. The image is a simulation from one setup (k = 0.10, assumes work is always available); `python3 schedule_chart.py` redraws it for your own `config.json` and learned `k` (`--k`/`--rate` to try other values).
+Simulated week with no manual usage (one setup, k = 0.10, work always available; redraw for yours with `python3 schedule_chart.py`). Autopilot opens a window only when the weekly total falls behind the linear pace line, so after a reset it waits a few hours, then opens one about every 15 h and works ~4 h a day. When you use Claude, your messages open the windows and autopilot only takes their tail.
 
-`fill = (100-u7) / windows_left / (k*100)` = share of each remaining 5h window that must be burned to still hit 100% weekly.
-Allowed tail = `max(tail_minutes, fill*ramp_gain*300)`; `>=300` → SATURATE (any time, opens windows). A week left untouched ramps up from day 1 instead of waiting for the last hours. Within a tick the job runs back-to-back (up to `max_runs_per_tick`), re-reading usage after each run.
+- **TAIL** (default): start only in the last minutes of a window. Tail = `max(tail_minutes, fill*ramp_gain*300)`, where `fill = (100-u7) / windows_left / (k*100)` is the share of each remaining window needed to reach 100% weekly, so a week left unused ramps up early.
+- **SATURATE** (tail ≥ 5h): weekly is far behind; run any time and open windows.
+- **Open a window** only if `fill >= open_window_fill` and `u7` is below pace.
+- **Weekly cap**: never above linear pace + `pace_margin`. **Intra-window pace line**: `u5` stays ≤ `100*elapsed_share + u5_pace_margin`, so the rest of the window stays free for you (SATURATE exempt).
+- **BURN** (`"burn": true` or `--burn`): spend as fast as possible until `max_u5`/`max_u7`; no headroom left for you.
+- Runs go back-to-back within a tick (`max_runs_per_tick`), re-reading usage after each. No new step starts with less than `min_step_minutes` (30) left.
 
-The tail only says *when* the autopilot may start; the intra-window pace line says *how much* it may hold. It stops spending once `u5` reaches `100 * elapsed_share + u5_pace_margin`, so a burst can no longer drain the window hours before it expires.
+## What it works on
+Per project, in config priority order:
+1. Open `autopilot/*` PR → review + fix until clean (`CLEAN`), then the driver merges it (CI gate).
+2. Else implement the next roadmap step **in full** (a whole section/phase, never a partial PR), one branch + PR per step (`autopilot/<MMDD>-<session6>-<slug>`). Unfinished → `INCOMPLETE`, resumed next run.
+3. Roadmap exhausted → author 3-6 new steps from deferred items, issues and ideas. Low review findings become `autopilot-followup` issues, folded into later steps or into sweep steps (4-12 issues each).
+
+Rules:
+- **Trust**: only PRs by the `gh` user from same-repo branches (or the user's fork for `push_remote`) are reviewed/merged; roadmap mode reads only `@me` issues.
+- **Blocked**: a `BLOCKED` run parks the project until its roadmap file changes or `--unblock`.
+- **Streak**: after `streak_limit` (5) PRs in one project, it is skipped for new work until another project opens a PR.
+- **Starved roadmaps**: a project with no pending step and no roadmap run for `starved_roadmap_days` (3) gets one ahead of others.
+- **Per-project options** (`project_opts`): `roadmap` path; `push_remote` (work from a fork, cross-repo PRs, no upstream issues); `merge: false` (stop at `READY`); `author_roadmap: false`; `depends_on` + `context` (this repo's work needs another project first: files `autopilot-dependency` issues there and waits on them).
+
+## CI gate
+Reviews never wait for CI. On `CLEAN`, the driver checks the PR every tick with `gh` (no tokens):
+- green (or no checks after `ci_settle_minutes`) → squash-merge (`merge: false` → `READY`)
+- red → Haiku summarises the failed logs and the PR goes back to review; red only on jobs also failing on the default branch → wait
+- pending after `ci_timeout_minutes` (30) or merge conflict → back to review
+- default branch red for `main_red_fix_hours` (2) → next implement run fixes it first
 
 ## Resume
-Every run gets a known `--session-id`. If a run ends without its status marker (killed at time limit, usage limit hit, crash) — or with `INCOMPLETE` (the step is unfinished) — the session is stored in `state.json` (`pending`) and the next run resumes it (`claude --resume`) in the same worktree without resetting it, before picking new work. Dropped after `max_resumes` (3), `resume_max_hours` (48) or if its PR is gone. Markers are matched loosely (`STATUS: X`, `**X**`, `X (note)` all count), so a decorated marker is no longer mistaken for a missing one.
-
-## Weekly cap (anti front-loading)
-Autopilot never pushes weekly usage past `pace + pace_margin` (pace = linear share of the week elapsed, margin 4 pts), re-checked after every run. The tail only decides *when* it may start; this cap decides *how much* it may spend. With no window open it starts one only if clearly behind the line (`fill >= open_window_fill` and `u7 < pace`).
-
-## CI gate (driver-side merge)
-A review run never waits for CI or merges. A clean review ends `CLEAN`; the driver records the PR head in `state.json` (`ci_wait`) and, on every tick (even when pacing says skip, since merging spends no budget), reads the PR's check rollup with `gh` — no model tokens:
-- **green** → `gh pr merge --squash --delete-branch --match-head-commit <sha>` (a `merge: false` project is parked `READY` instead). No checks reported counts as green when the repo has no workflows, or after `ci_settle_minutes` (5) when none triggered; fork CI awaiting maintainer approval counts as green for `merge: false`.
-- **red only on jobs the default branch also fails** (latest completed push run per workflow) → the PR keeps waiting (one `WAITING` gate row, no review run). Once the default branch is green, it goes back to review with a note to merge the default branch in first.
-- **red** → the failed job logs (annotations + lines before the first `##[error]`) are condensed by Haiku and stored (`ci_context`); the PR goes back to review, whose prompt shows the summary under CI STATUS as a Medium+ finding.
-- **still pending after `ci_timeout_minutes` (30)** or **merge failed** (conflict) → back to review with that note.
-- **Default branch red for `main_red_fix_hours` (2)** (tracked as `main_red` in `state.json`) → the next implement prompt for that project says to fix it first in a PR titled `Fix <default> CI: ...`, with Haiku's summary of the failing jobs. This overrides `impl_exhausted` and the precheck, and stops once such a PR is open.
-- New commits on the PR drop the wait. A PR waiting on CI is not reviewed. Gate outcomes go to `runs.jsonl` as `mode: "gate"` rows (`MERGED`, `READY`, `CI_FAILED`, `CI_TIMEOUT`, `MERGE_FAILED`).
+Each run has a known session id. A run cut off (time/usage limit, crash) or ending `INCOMPLETE` is resumed with `claude --resume` in the same worktree, up to `max_resumes` times within `resume_max_hours`.
 
 ## Models
-`model_by_mode` in `config.json`: roadmap authoring and the weekly self-review run on `opus` (alias → latest Opus); everything else uses `model` (sonnet).
+`model` (sonnet) for runs; `model_by_mode` puts roadmap authoring and self-review on opus. `helper_model` (haiku) does one-shot helpers with Python fallbacks: CI log summaries, Telegram digests, and a precheck that skips implement runs when no roadmap step is pending (`"precheck": false` to disable).
 
-`helper_model` (default `haiku`) runs tool-less one-shot helpers; each falls back to plain Python if the call fails. Calls are logged to `helpers.jsonl` (cost per task in `analyze.py`):
-- **cisummary**: condenses failed CI logs for the next review (`prompts/cisummary.md`).
-- **digest**: rewrites a Telegram digest of `digest_summary_min_events` (6)+ events into one line per project (`prompts/digest.md`).
-- **precheck**: before a new Sonnet implement run, reads the roadmap and answers `PENDING: <step>` or `NONE` (`prompts/precheck.md`). `NONE` marks the project `impl_exhausted` without the Sonnet run. Biased to `PENDING` when unsure; skipped for `merge: false` projects and when dependency issues are open. `"precheck": false` disables it.
-
-## Telemetry + weekly self-review
-- `runs.jsonl`: one row per run (mode, model, duration vs budget, cost, turns, marker, interruption, usage before/after). `usage-log.jsonl`: one row per tick incl. the decision and its reason.
-- `python3 analyze.py [--days 7]` prints the summary (run efficiency, PR iterations per merge, window utilization/wasted headroom, week trajectory, skip reasons, learned k).
-- Every `selfreview_days` (7), once ≥ `selfreview_min_runs` runs exist, the next GO tick runs an Opus self-review (`prompts/selfreview.md`) before other work. Force: `python3 autopilot.py --force --mode selfreview`.
-- Guardrails (enforced by the driver after the run): it may change at most 3 whitelisted numeric config keys inside `BOUNDS` (see autopilot.py); edits to autopilot.py / analyze.py / prompts / any other config key are reverted. Prompt/code ideas go to `reports/<date>-selfreview.md` as proposals for you to approve. Backups: `reports/backup-*`.
-
-## Pruning
-After a *completed* weekly self-review (`REVIEW_DONE`) the job prunes: per-run `logs/*.log|.err` older than `log_keep_days` (14), `tick.log` lines older than that (trimmed in place, safe with cron's append handle), `usage-log.jsonl` / `runs.jsonl` / `helpers.jsonl` rows and `reports/backup-*` / `stats-*` older than `data_keep_days` (90). Retention keys are not editable by the self-review. Manual: `python3 autopilot.py --prune [--dry-run]`.
+## Telemetry, self-review, pruning
+- `runs.jsonl` (one row per run), `usage-log.jsonl` (one row per tick with the decision). `python3 analyze.py [--days 7]` summarises them.
+- Every `selfreview_days` (7) an Opus self-review runs. It may change at most 3 numeric config keys within `BOUNDS`; other edits are reverted and ideas go to `reports/<date>-selfreview.md`.
+- After a self-review, logs older than `log_keep_days` (14) and data older than `data_keep_days` (90) are pruned (`--prune [--dry-run]` by hand).
+- Telegram: urgent events at once, routine ones batched every `digest_minutes` (60).
