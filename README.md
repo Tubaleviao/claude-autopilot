@@ -35,6 +35,10 @@ Needs `gh` authenticated. Cron line:
     */10 * * * * PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin HOME=$HOME flock -n /path/to/claude-autopilot/lock python3 /path/to/claude-autopilot/autopilot.py >> /path/to/claude-autopilot/logs/tick.log 2>&1
 
 ## Pacing (ramp)
+![Autopilot schedule over one week with no manual usage](docs/weekly-schedule.svg)
+
+What a week looks like if you never use Claude yourself: autopilot works about 4 h a day (2.5–5.5 h), in two or three bursts. It opens a new 5h window roughly every 15 h, once weekly usage falls behind the linear pace line, and keeps weekly usage on that line until it reaches ~100% at the reset. When you use Claude yourself, your usage opens windows and raises weekly %, so autopilot only takes each window's tail. Regenerate with `python3 schedule_chart.py` (uses your config and learned `k`; `--k`/`--rate` to try other values).
+
 `fill = (100-u7) / windows_left / (k*100)` = share of each remaining 5h window that must be burned to still hit 100% weekly.
 Allowed tail = `max(tail_minutes, fill*ramp_gain*300)`; `>=300` → SATURATE (any time, opens windows). A week left untouched ramps up from day 1 instead of waiting for the last hours. Within a tick the job runs back-to-back (up to `max_runs_per_tick`), re-reading usage after each run.
 

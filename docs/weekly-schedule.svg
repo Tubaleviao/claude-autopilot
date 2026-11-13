@@ -1,0 +1,252 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 670" width="920" height="670" font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+<rect width="920" height="670" rx="12" fill="#fcfcfb"/>
+<text x="32" y="40" font-size="18" fill="#0b0b0b" text-anchor="start" font-weight="600">Autopilot over one week when you don't use Claude yourself</text>
+<text x="32" y="62" font-size="12" fill="#8a8984" text-anchor="start" font-weight="400">Simulated with the real decide() policy · learned k = 0.10 weekly % per 1% of the 5h window · 0.55% of the window per run-minute</text>
+<text x="32" y="96" font-size="13" fill="#0b0b0b" text-anchor="start" font-weight="600">Minutes of autopilot work per hour</text>
+<text x="109.0" y="122" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="400">+0h</text>
+<text x="187.0" y="122" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="400">+3h</text>
+<text x="265.0" y="122" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="400">+6h</text>
+<text x="343.0" y="122" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="400">+9h</text>
+<text x="421.0" y="122" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="400">+12h</text>
+<text x="499.0" y="122" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="400">+15h</text>
+<text x="577.0" y="122" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="400">+18h</text>
+<text x="655.0" y="122" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="400">+21h</text>
+<text x="738" y="122" font-size="10" fill="#8a8984" text-anchor="start" font-weight="400">work</text>
+<text x="802" y="122" font-size="10" fill="#8a8984" text-anchor="start" font-weight="400">weekly used</text>
+<text x="32" y="145.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="400">Day 1</text>
+<rect x="97.0" y="128" width="24" height="26" rx="3" fill="#efeeea"><title>Day 1, +0h: 0 min</title></rect>
+<rect x="123.0" y="128" width="24" height="26" rx="3" fill="#efeeea"><title>Day 1, +1h: 0 min</title></rect>
+<rect x="149.0" y="128" width="24" height="26" rx="3" fill="#efeeea"><title>Day 1, +2h: 0 min</title></rect>
+<rect x="175.0" y="128" width="24" height="26" rx="3" fill="#efeeea"><title>Day 1, +3h: 0 min</title></rect>
+<rect x="201.0" y="128" width="24" height="26" rx="3" fill="#efeeea"><title>Day 1, +4h: 0 min</title></rect>
+<rect x="227.0" y="128" width="24" height="26" rx="3" fill="#efeeea"><title>Day 1, +5h: 0 min</title></rect>
+<rect x="253.0" y="128" width="24" height="26" rx="3" fill="#3987e5"><title>Day 1, +6h: 30 min</title></rect>
+<rect x="279.0" y="128" width="24" height="26" rx="3" fill="#3987e5"><title>Day 1, +7h: 30 min</title></rect>
+<rect x="305.0" y="128" width="24" height="26" rx="3" fill="#efeeea"><title>Day 1, +8h: 0 min</title></rect>
+<rect x="331.0" y="128" width="24" height="26" rx="3" fill="#6da7ec"><title>Day 1, +9h: 20 min</title></rect>
+<rect x="357.0" y="128" width="24" height="26" rx="3" fill="#184f95"><title>Day 1, +10h: 60 min</title></rect>
+<rect x="383.0" y="128" width="24" height="26" rx="3" fill="#6da7ec"><title>Day 1, +11h: 28 min</title></rect>
+<rect x="409.0" y="128" width="24" height="26" rx="3" fill="#efeeea"><title>Day 1, +12h: 0 min</title></rect>
+<rect x="435.0" y="128" width="24" height="26" rx="3" fill="#efeeea"><title>Day 1, +13h: 0 min</title></rect>
+<rect x="461.0" y="128" width="24" height="26" rx="3" fill="#efeeea"><title>Day 1, +14h: 0 min</title></rect>
+<rect x="487.0" y="128" width="24" height="26" rx="3" fill="#efeeea"><title>Day 1, +15h: 0 min</title></rect>
+<rect x="513.0" y="128" width="24" height="26" rx="3" fill="#efeeea"><title>Day 1, +16h: 0 min</title></rect>
+<rect x="539.0" y="128" width="24" height="26" rx="3" fill="#efeeea"><title>Day 1, +17h: 0 min</title></rect>
+<rect x="565.0" y="128" width="24" height="26" rx="3" fill="#efeeea"><title>Day 1, +18h: 0 min</title></rect>
+<rect x="591.0" y="128" width="24" height="26" rx="3" fill="#efeeea"><title>Day 1, +19h: 0 min</title></rect>
+<rect x="617.0" y="128" width="24" height="26" rx="3" fill="#efeeea"><title>Day 1, +20h: 0 min</title></rect>
+<rect x="643.0" y="128" width="24" height="26" rx="3" fill="#cde2fb"><title>Day 1, +21h: 2 min</title></rect>
+<rect x="669.0" y="128" width="24" height="26" rx="3" fill="#184f95"><title>Day 1, +22h: 58 min</title></rect>
+<rect x="695.0" y="128" width="24" height="26" rx="3" fill="#efeeea"><title>Day 1, +23h: 0 min</title></rect>
+<rect x="266.0" y="156" width="128.0" height="3" rx="1.5" fill="#8a8984"/>
+<rect x="668.1333333333333" y="156" width="50.866666666666674" height="3" rx="1.5" fill="#8a8984"/>
+<text x="738" y="145.0" font-size="12" fill="#0b0b0b" text-anchor="start" font-weight="600">3.8 h</text>
+<text x="802" y="145.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="400">13%</text>
+<text x="32" y="179.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="400">Day 2</text>
+<rect x="97.0" y="162" width="24" height="26" rx="3" fill="#efeeea"><title>Day 2, +0h: 0 min</title></rect>
+<rect x="123.0" y="162" width="24" height="26" rx="3" fill="#184f95"><title>Day 2, +1h: 52 min</title></rect>
+<rect x="149.0" y="162" width="24" height="26" rx="3" fill="#184f95"><title>Day 2, +2h: 56 min</title></rect>
+<rect x="175.0" y="162" width="24" height="26" rx="3" fill="#efeeea"><title>Day 2, +3h: 0 min</title></rect>
+<rect x="201.0" y="162" width="24" height="26" rx="3" fill="#efeeea"><title>Day 2, +4h: 0 min</title></rect>
+<rect x="227.0" y="162" width="24" height="26" rx="3" fill="#efeeea"><title>Day 2, +5h: 0 min</title></rect>
+<rect x="253.0" y="162" width="24" height="26" rx="3" fill="#efeeea"><title>Day 2, +6h: 0 min</title></rect>
+<rect x="279.0" y="162" width="24" height="26" rx="3" fill="#efeeea"><title>Day 2, +7h: 0 min</title></rect>
+<rect x="305.0" y="162" width="24" height="26" rx="3" fill="#efeeea"><title>Day 2, +8h: 0 min</title></rect>
+<rect x="331.0" y="162" width="24" height="26" rx="3" fill="#efeeea"><title>Day 2, +9h: 0 min</title></rect>
+<rect x="357.0" y="162" width="24" height="26" rx="3" fill="#efeeea"><title>Day 2, +10h: 0 min</title></rect>
+<rect x="383.0" y="162" width="24" height="26" rx="3" fill="#efeeea"><title>Day 2, +11h: 0 min</title></rect>
+<rect x="409.0" y="162" width="24" height="26" rx="3" fill="#efeeea"><title>Day 2, +12h: 0 min</title></rect>
+<rect x="435.0" y="162" width="24" height="26" rx="3" fill="#256abf"><title>Day 2, +13h: 44 min</title></rect>
+<rect x="461.0" y="162" width="24" height="26" rx="3" fill="#9ec5f4"><title>Day 2, +14h: 16 min</title></rect>
+<rect x="487.0" y="162" width="24" height="26" rx="3" fill="#efeeea"><title>Day 2, +15h: 0 min</title></rect>
+<rect x="513.0" y="162" width="24" height="26" rx="3" fill="#3987e5"><title>Day 2, +16h: 34 min</title></rect>
+<rect x="539.0" y="162" width="24" height="26" rx="3" fill="#184f95"><title>Day 2, +17h: 60 min</title></rect>
+<rect x="565.0" y="162" width="24" height="26" rx="3" fill="#9ec5f4"><title>Day 2, +18h: 14 min</title></rect>
+<rect x="591.0" y="162" width="24" height="26" rx="3" fill="#efeeea"><title>Day 2, +19h: 0 min</title></rect>
+<rect x="617.0" y="162" width="24" height="26" rx="3" fill="#efeeea"><title>Day 2, +20h: 0 min</title></rect>
+<rect x="643.0" y="162" width="24" height="26" rx="3" fill="#efeeea"><title>Day 2, +21h: 0 min</title></rect>
+<rect x="669.0" y="162" width="24" height="26" rx="3" fill="#efeeea"><title>Day 2, +22h: 0 min</title></rect>
+<rect x="695.0" y="162" width="24" height="26" rx="3" fill="#efeeea"><title>Day 2, +23h: 0 min</title></rect>
+<rect x="97.0" y="190" width="75.13333333333333" height="3" rx="1.5" fill="#8a8984"/>
+<rect x="441.93333333333334" y="190" width="127.99999999999994" height="3" rx="1.5" fill="#8a8984"/>
+<text x="738" y="179.0" font-size="12" fill="#0b0b0b" text-anchor="start" font-weight="600">4.6 h</text>
+<text x="802" y="179.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="400">29%</text>
+<text x="32" y="213.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="400">Day 3</text>
+<rect x="97.0" y="196" width="24" height="26" rx="3" fill="#efeeea"><title>Day 3, +0h: 0 min</title></rect>
+<rect x="123.0" y="196" width="24" height="26" rx="3" fill="#efeeea"><title>Day 3, +1h: 0 min</title></rect>
+<rect x="149.0" y="196" width="24" height="26" rx="3" fill="#efeeea"><title>Day 3, +2h: 0 min</title></rect>
+<rect x="175.0" y="196" width="24" height="26" rx="3" fill="#efeeea"><title>Day 3, +3h: 0 min</title></rect>
+<rect x="201.0" y="196" width="24" height="26" rx="3" fill="#9ec5f4"><title>Day 3, +4h: 16 min</title></rect>
+<rect x="227.0" y="196" width="24" height="26" rx="3" fill="#256abf"><title>Day 3, +5h: 44 min</title></rect>
+<rect x="253.0" y="196" width="24" height="26" rx="3" fill="#efeeea"><title>Day 3, +6h: 0 min</title></rect>
+<rect x="279.0" y="196" width="24" height="26" rx="3" fill="#cde2fb"><title>Day 3, +7h: 6 min</title></rect>
+<rect x="305.0" y="196" width="24" height="26" rx="3" fill="#184f95"><title>Day 3, +8h: 60 min</title></rect>
+<rect x="331.0" y="196" width="24" height="26" rx="3" fill="#256abf"><title>Day 3, +9h: 42 min</title></rect>
+<rect x="357.0" y="196" width="24" height="26" rx="3" fill="#efeeea"><title>Day 3, +10h: 0 min</title></rect>
+<rect x="383.0" y="196" width="24" height="26" rx="3" fill="#efeeea"><title>Day 3, +11h: 0 min</title></rect>
+<rect x="409.0" y="196" width="24" height="26" rx="3" fill="#efeeea"><title>Day 3, +12h: 0 min</title></rect>
+<rect x="435.0" y="196" width="24" height="26" rx="3" fill="#efeeea"><title>Day 3, +13h: 0 min</title></rect>
+<rect x="461.0" y="196" width="24" height="26" rx="3" fill="#efeeea"><title>Day 3, +14h: 0 min</title></rect>
+<rect x="487.0" y="196" width="24" height="26" rx="3" fill="#efeeea"><title>Day 3, +15h: 0 min</title></rect>
+<rect x="513.0" y="196" width="24" height="26" rx="3" fill="#efeeea"><title>Day 3, +16h: 0 min</title></rect>
+<rect x="539.0" y="196" width="24" height="26" rx="3" fill="#efeeea"><title>Day 3, +17h: 0 min</title></rect>
+<rect x="565.0" y="196" width="24" height="26" rx="3" fill="#efeeea"><title>Day 3, +18h: 0 min</title></rect>
+<rect x="591.0" y="196" width="24" height="26" rx="3" fill="#efeeea"><title>Day 3, +19h: 0 min</title></rect>
+<rect x="617.0" y="196" width="24" height="26" rx="3" fill="#184f95"><title>Day 3, +20h: 58 min</title></rect>
+<rect x="643.0" y="196" width="24" height="26" rx="3" fill="#cde2fb"><title>Day 3, +21h: 2 min</title></rect>
+<rect x="669.0" y="196" width="24" height="26" rx="3" fill="#efeeea"><title>Day 3, +22h: 0 min</title></rect>
+<rect x="695.0" y="196" width="24" height="26" rx="3" fill="#256abf"><title>Day 3, +23h: 48 min</title></rect>
+<rect x="220.06666666666666" y="224" width="127.99999999999994" height="3" rx="1.5" fill="#8a8984"/>
+<rect x="617.8666666666667" y="224" width="101.13333333333333" height="3" rx="1.5" fill="#8a8984"/>
+<text x="738" y="213.0" font-size="12" fill="#0b0b0b" text-anchor="start" font-weight="600">4.6 h</text>
+<text x="802" y="213.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="400">44%</text>
+<text x="32" y="247.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="400">Day 4</text>
+<rect x="97.0" y="230" width="24" height="26" rx="3" fill="#184f95"><title>Day 4, +0h: 60 min</title></rect>
+<rect x="123.0" y="230" width="24" height="26" rx="3" fill="#efeeea"><title>Day 4, +1h: 0 min</title></rect>
+<rect x="149.0" y="230" width="24" height="26" rx="3" fill="#efeeea"><title>Day 4, +2h: 0 min</title></rect>
+<rect x="175.0" y="230" width="24" height="26" rx="3" fill="#efeeea"><title>Day 4, +3h: 0 min</title></rect>
+<rect x="201.0" y="230" width="24" height="26" rx="3" fill="#efeeea"><title>Day 4, +4h: 0 min</title></rect>
+<rect x="227.0" y="230" width="24" height="26" rx="3" fill="#efeeea"><title>Day 4, +5h: 0 min</title></rect>
+<rect x="253.0" y="230" width="24" height="26" rx="3" fill="#efeeea"><title>Day 4, +6h: 0 min</title></rect>
+<rect x="279.0" y="230" width="24" height="26" rx="3" fill="#efeeea"><title>Day 4, +7h: 0 min</title></rect>
+<rect x="305.0" y="230" width="24" height="26" rx="3" fill="#efeeea"><title>Day 4, +8h: 0 min</title></rect>
+<rect x="331.0" y="230" width="24" height="26" rx="3" fill="#efeeea"><title>Day 4, +9h: 0 min</title></rect>
+<rect x="357.0" y="230" width="24" height="26" rx="3" fill="#efeeea"><title>Day 4, +10h: 0 min</title></rect>
+<rect x="383.0" y="230" width="24" height="26" rx="3" fill="#3987e5"><title>Day 4, +11h: 30 min</title></rect>
+<rect x="409.0" y="230" width="24" height="26" rx="3" fill="#3987e5"><title>Day 4, +12h: 30 min</title></rect>
+<rect x="435.0" y="230" width="24" height="26" rx="3" fill="#efeeea"><title>Day 4, +13h: 0 min</title></rect>
+<rect x="461.0" y="230" width="24" height="26" rx="3" fill="#6da7ec"><title>Day 4, +14h: 20 min</title></rect>
+<rect x="487.0" y="230" width="24" height="26" rx="3" fill="#184f95"><title>Day 4, +15h: 60 min</title></rect>
+<rect x="513.0" y="230" width="24" height="26" rx="3" fill="#6da7ec"><title>Day 4, +16h: 28 min</title></rect>
+<rect x="539.0" y="230" width="24" height="26" rx="3" fill="#efeeea"><title>Day 4, +17h: 0 min</title></rect>
+<rect x="565.0" y="230" width="24" height="26" rx="3" fill="#efeeea"><title>Day 4, +18h: 0 min</title></rect>
+<rect x="591.0" y="230" width="24" height="26" rx="3" fill="#efeeea"><title>Day 4, +19h: 0 min</title></rect>
+<rect x="617.0" y="230" width="24" height="26" rx="3" fill="#efeeea"><title>Day 4, +20h: 0 min</title></rect>
+<rect x="643.0" y="230" width="24" height="26" rx="3" fill="#efeeea"><title>Day 4, +21h: 0 min</title></rect>
+<rect x="669.0" y="230" width="24" height="26" rx="3" fill="#efeeea"><title>Day 4, +22h: 0 min</title></rect>
+<rect x="695.0" y="230" width="24" height="26" rx="3" fill="#efeeea"><title>Day 4, +23h: 0 min</title></rect>
+<rect x="97.0" y="258" width="24.866666666666674" height="3" rx="1.5" fill="#8a8984"/>
+<rect x="396.0" y="258" width="128.0" height="3" rx="1.5" fill="#8a8984"/>
+<text x="738" y="247.0" font-size="12" fill="#0b0b0b" text-anchor="start" font-weight="600">3.8 h</text>
+<text x="802" y="247.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="400">57%</text>
+<text x="32" y="281.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="400">Day 5</text>
+<rect x="97.0" y="264" width="24" height="26" rx="3" fill="#efeeea"><title>Day 5, +0h: 0 min</title></rect>
+<rect x="123.0" y="264" width="24" height="26" rx="3" fill="#efeeea"><title>Day 5, +1h: 0 min</title></rect>
+<rect x="149.0" y="264" width="24" height="26" rx="3" fill="#cde2fb"><title>Day 5, +2h: 2 min</title></rect>
+<rect x="175.0" y="264" width="24" height="26" rx="3" fill="#184f95"><title>Day 5, +3h: 58 min</title></rect>
+<rect x="201.0" y="264" width="24" height="26" rx="3" fill="#efeeea"><title>Day 5, +4h: 0 min</title></rect>
+<rect x="227.0" y="264" width="24" height="26" rx="3" fill="#efeeea"><title>Day 5, +5h: 0 min</title></rect>
+<rect x="253.0" y="264" width="24" height="26" rx="3" fill="#184f95"><title>Day 5, +6h: 52 min</title></rect>
+<rect x="279.0" y="264" width="24" height="26" rx="3" fill="#184f95"><title>Day 5, +7h: 56 min</title></rect>
+<rect x="305.0" y="264" width="24" height="26" rx="3" fill="#efeeea"><title>Day 5, +8h: 0 min</title></rect>
+<rect x="331.0" y="264" width="24" height="26" rx="3" fill="#efeeea"><title>Day 5, +9h: 0 min</title></rect>
+<rect x="357.0" y="264" width="24" height="26" rx="3" fill="#efeeea"><title>Day 5, +10h: 0 min</title></rect>
+<rect x="383.0" y="264" width="24" height="26" rx="3" fill="#efeeea"><title>Day 5, +11h: 0 min</title></rect>
+<rect x="409.0" y="264" width="24" height="26" rx="3" fill="#efeeea"><title>Day 5, +12h: 0 min</title></rect>
+<rect x="435.0" y="264" width="24" height="26" rx="3" fill="#efeeea"><title>Day 5, +13h: 0 min</title></rect>
+<rect x="461.0" y="264" width="24" height="26" rx="3" fill="#efeeea"><title>Day 5, +14h: 0 min</title></rect>
+<rect x="487.0" y="264" width="24" height="26" rx="3" fill="#efeeea"><title>Day 5, +15h: 0 min</title></rect>
+<rect x="513.0" y="264" width="24" height="26" rx="3" fill="#efeeea"><title>Day 5, +16h: 0 min</title></rect>
+<rect x="539.0" y="264" width="24" height="26" rx="3" fill="#efeeea"><title>Day 5, +17h: 0 min</title></rect>
+<rect x="565.0" y="264" width="24" height="26" rx="3" fill="#256abf"><title>Day 5, +18h: 44 min</title></rect>
+<rect x="591.0" y="264" width="24" height="26" rx="3" fill="#9ec5f4"><title>Day 5, +19h: 16 min</title></rect>
+<rect x="617.0" y="264" width="24" height="26" rx="3" fill="#efeeea"><title>Day 5, +20h: 0 min</title></rect>
+<rect x="643.0" y="264" width="24" height="26" rx="3" fill="#3987e5"><title>Day 5, +21h: 34 min</title></rect>
+<rect x="669.0" y="264" width="24" height="26" rx="3" fill="#184f95"><title>Day 5, +22h: 60 min</title></rect>
+<rect x="695.0" y="264" width="24" height="26" rx="3" fill="#9ec5f4"><title>Day 5, +23h: 14 min</title></rect>
+<rect x="174.13333333333333" y="292" width="128.0" height="3" rx="1.5" fill="#8a8984"/>
+<rect x="571.9333333333333" y="292" width="128.0" height="3" rx="1.5" fill="#8a8984"/>
+<text x="738" y="281.0" font-size="12" fill="#0b0b0b" text-anchor="start" font-weight="600">5.6 h</text>
+<text x="802" y="281.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="400">76%</text>
+<text x="32" y="315.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="400">Day 6</text>
+<rect x="97.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +0h: 0 min</title></rect>
+<rect x="123.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +1h: 0 min</title></rect>
+<rect x="149.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +2h: 0 min</title></rect>
+<rect x="175.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +3h: 0 min</title></rect>
+<rect x="201.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +4h: 0 min</title></rect>
+<rect x="227.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +5h: 0 min</title></rect>
+<rect x="253.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +6h: 0 min</title></rect>
+<rect x="279.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +7h: 0 min</title></rect>
+<rect x="305.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +8h: 0 min</title></rect>
+<rect x="331.0" y="298" width="24" height="26" rx="3" fill="#9ec5f4"><title>Day 6, +9h: 16 min</title></rect>
+<rect x="357.0" y="298" width="24" height="26" rx="3" fill="#256abf"><title>Day 6, +10h: 44 min</title></rect>
+<rect x="383.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +11h: 0 min</title></rect>
+<rect x="409.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +12h: 0 min</title></rect>
+<rect x="435.0" y="298" width="24" height="26" rx="3" fill="#184f95"><title>Day 6, +13h: 56 min</title></rect>
+<rect x="461.0" y="298" width="24" height="26" rx="3" fill="#256abf"><title>Day 6, +14h: 42 min</title></rect>
+<rect x="487.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +15h: 0 min</title></rect>
+<rect x="513.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +16h: 0 min</title></rect>
+<rect x="539.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +17h: 0 min</title></rect>
+<rect x="565.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +18h: 0 min</title></rect>
+<rect x="591.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +19h: 0 min</title></rect>
+<rect x="617.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +20h: 0 min</title></rect>
+<rect x="643.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +21h: 0 min</title></rect>
+<rect x="669.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +22h: 0 min</title></rect>
+<rect x="695.0" y="298" width="24" height="26" rx="3" fill="#efeeea"><title>Day 6, +23h: 0 min</title></rect>
+<rect x="350.0666666666666" y="326" width="128.00000000000006" height="3" rx="1.5" fill="#8a8984"/>
+<text x="738" y="315.0" font-size="12" fill="#0b0b0b" text-anchor="start" font-weight="600">2.6 h</text>
+<text x="802" y="315.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="400">85%</text>
+<text x="32" y="349.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="400">Day 7</text>
+<rect x="97.0" y="332" width="24" height="26" rx="3" fill="#256abf"><title>Day 7, +0h: 48 min</title></rect>
+<rect x="123.0" y="332" width="24" height="26" rx="3" fill="#9ec5f4"><title>Day 7, +1h: 12 min</title></rect>
+<rect x="149.0" y="332" width="24" height="26" rx="3" fill="#efeeea"><title>Day 7, +2h: 0 min</title></rect>
+<rect x="175.0" y="332" width="24" height="26" rx="3" fill="#6da7ec"><title>Day 7, +3h: 28 min</title></rect>
+<rect x="201.0" y="332" width="24" height="26" rx="3" fill="#184f95"><title>Day 7, +4h: 60 min</title></rect>
+<rect x="227.0" y="332" width="24" height="26" rx="3" fill="#9ec5f4"><title>Day 7, +5h: 10 min</title></rect>
+<rect x="253.0" y="332" width="24" height="26" rx="3" fill="#efeeea"><title>Day 7, +6h: 0 min</title></rect>
+<rect x="279.0" y="332" width="24" height="26" rx="3" fill="#efeeea"><title>Day 7, +7h: 0 min</title></rect>
+<rect x="305.0" y="332" width="24" height="26" rx="3" fill="#efeeea"><title>Day 7, +8h: 0 min</title></rect>
+<rect x="331.0" y="332" width="24" height="26" rx="3" fill="#efeeea"><title>Day 7, +9h: 0 min</title></rect>
+<rect x="357.0" y="332" width="24" height="26" rx="3" fill="#efeeea"><title>Day 7, +10h: 0 min</title></rect>
+<rect x="383.0" y="332" width="24" height="26" rx="3" fill="#efeeea"><title>Day 7, +11h: 0 min</title></rect>
+<rect x="409.0" y="332" width="24" height="26" rx="3" fill="#efeeea"><title>Day 7, +12h: 0 min</title></rect>
+<rect x="435.0" y="332" width="24" height="26" rx="3" fill="#efeeea"><title>Day 7, +13h: 0 min</title></rect>
+<rect x="461.0" y="332" width="24" height="26" rx="3" fill="#6da7ec"><title>Day 7, +14h: 20 min</title></rect>
+<rect x="487.0" y="332" width="24" height="26" rx="3" fill="#256abf"><title>Day 7, +15h: 40 min</title></rect>
+<rect x="513.0" y="332" width="24" height="26" rx="3" fill="#efeeea"><title>Day 7, +16h: 0 min</title></rect>
+<rect x="539.0" y="332" width="24" height="26" rx="3" fill="#efeeea"><title>Day 7, +17h: 0 min</title></rect>
+<rect x="565.0" y="332" width="24" height="26" rx="3" fill="#256abf"><title>Day 7, +18h: 40 min</title></rect>
+<rect x="591.0" y="332" width="24" height="26" rx="3" fill="#6da7ec"><title>Day 7, +19h: 20 min</title></rect>
+<rect x="617.0" y="332" width="24" height="26" rx="3" fill="#efeeea"><title>Day 7, +20h: 0 min</title></rect>
+<rect x="643.0" y="332" width="24" height="26" rx="3" fill="#efeeea"><title>Day 7, +21h: 0 min</title></rect>
+<rect x="669.0" y="332" width="24" height="26" rx="3" fill="#efeeea"><title>Day 7, +22h: 0 min</title></rect>
+<rect x="695.0" y="332" width="24" height="26" rx="3" fill="#efeeea"><title>Day 7, +23h: 0 min</title></rect>
+<rect x="102.2" y="360" width="128.0" height="3" rx="1.5" fill="#8a8984"/>
+<rect x="478.3333333333333" y="360" width="128.00000000000006" height="3" rx="1.5" fill="#8a8984"/>
+<text x="738" y="349.0" font-size="12" fill="#0b0b0b" text-anchor="start" font-weight="600">4.6 h</text>
+<text x="802" y="349.0" font-size="12" fill="#52514e" text-anchor="start" font-weight="400">100%</text>
+<text x="96" y="391" font-size="10" fill="#8a8984" text-anchor="end" font-weight="400">0 min</text>
+<rect x="102" y="380" width="14" height="14" rx="3" fill="#efeeea"/>
+<rect x="120" y="380" width="16" height="14" rx="3" fill="#cde2fb"/>
+<rect x="138" y="380" width="16" height="14" rx="3" fill="#9ec5f4"/>
+<rect x="156" y="380" width="16" height="14" rx="3" fill="#6da7ec"/>
+<rect x="174" y="380" width="16" height="14" rx="3" fill="#3987e5"/>
+<rect x="192" y="380" width="16" height="14" rx="3" fill="#256abf"/>
+<rect x="210" y="380" width="16" height="14" rx="3" fill="#184f95"/>
+<text x="232" y="391" font-size="10" fill="#8a8984" text-anchor="start" font-weight="400">60 min</text>
+<rect x="296" y="385" width="30" height="3" rx="1.5" fill="#8a8984"/>
+<text x="332" y="391" font-size="10" fill="#8a8984" text-anchor="start" font-weight="400">5h window opened by autopilot</text>
+<text x="32" y="428" font-size="13" fill="#0b0b0b" text-anchor="start" font-weight="600">Weekly usage across the period</text>
+<line x1="96" x2="720" y1="600.0" y2="600.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="88" y="604.0" font-size="10" fill="#8a8984" text-anchor="end" font-weight="400">0%</text>
+<line x1="96" x2="720" y1="525.0" y2="525.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="88" y="529.0" font-size="10" fill="#8a8984" text-anchor="end" font-weight="400">50%</text>
+<line x1="96" x2="720" y1="450.0" y2="450.0" stroke="#e4e3df" stroke-width="1"/>
+<text x="88" y="454.0" font-size="10" fill="#8a8984" text-anchor="end" font-weight="400">100%</text>
+<text x="96.0" y="616" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="400">Day 1</text>
+<text x="185.14285714285714" y="616" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="400">Day 2</text>
+<text x="274.2857142857143" y="616" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="400">Day 3</text>
+<text x="363.4285714285714" y="616" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="400">Day 4</text>
+<text x="452.57142857142856" y="616" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="400">Day 5</text>
+<text x="541.7142857142858" y="616" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="400">Day 6</text>
+<text x="630.8571428571428" y="616" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="400">Day 7</text>
+<text x="720.0" y="616" font-size="10" fill="#8a8984" text-anchor="middle" font-weight="400">reset</text>
+<line x1="96" y1="600" x2="720" y2="450" stroke="#8a8984" stroke-width="2" stroke-dasharray="5 4"/>
+<polyline points="96.0,600.0 97.9,600.0 99.7,600.0 101.6,600.0 103.4,600.0 105.3,600.0 107.1,600.0 109.0,600.0 110.9,600.0 112.7,600.0 114.6,600.0 116.4,600.0 118.3,600.0 120.1,599.9 122.0,597.4 123.9,594.9 125.7,594.9 127.6,594.9 129.4,594.9 131.3,594.9 133.1,593.1 135.0,590.6 136.9,588.0 138.7,585.7 140.6,585.7 142.4,585.7 144.3,585.7 146.1,585.7 148.0,585.7 149.9,585.7 151.7,585.7 153.6,585.7 155.4,585.7 157.3,585.7 159.1,585.7 161.0,585.7 162.9,585.7 164.7,585.7 166.6,585.7 168.4,585.7 170.3,585.7 172.1,585.7 174.0,585.7 175.9,585.7 177.7,585.4 179.6,582.9 181.4,580.6 183.3,580.6 185.1,580.6 187.0,580.6 188.9,580.6 190.7,578.6 192.6,576.1 194.4,573.5 196.3,571.4 198.1,571.4 200.0,571.4 201.9,571.4 203.7,571.4 205.6,571.4 207.4,571.4 209.3,571.4 211.1,571.4 213.0,571.4 214.9,571.4 216.7,571.4 218.6,571.4 220.4,571.4 222.3,571.4 224.1,571.4 226.0,571.4 227.9,571.4 229.7,571.4 231.6,571.4 233.4,571.4 235.3,570.1 237.1,567.6 239.0,566.3 240.9,566.3 242.7,566.3 244.6,566.3 246.4,565.9 248.3,563.3 250.1,560.8 252.0,558.2 253.9,557.1 255.7,557.1 257.6,557.1 259.4,557.1 261.3,557.1 263.1,557.1 265.0,557.1 266.9,557.1 268.7,557.1 270.6,557.1 272.4,557.1 274.3,557.1 276.1,557.1 278.0,557.1 279.9,557.1 281.7,557.1 283.6,557.1 285.4,557.1 287.3,557.1 289.1,557.1 291.0,557.1 292.9,555.7 294.7,553.1 296.6,552.0 298.4,552.0 300.3,552.0 302.1,552.0 304.0,551.4 305.9,548.9 307.7,546.3 309.6,543.8 311.4,542.8 313.3,542.8 315.1,542.8 317.0,542.8 318.9,542.8 320.7,542.8 322.6,542.8 324.4,542.8 326.3,542.8 328.1,542.8 330.0,542.8 331.9,542.8 333.7,542.8 335.6,542.8 337.4,542.8 339.3,542.8 341.1,542.8 343.0,542.8 344.9,542.8 346.7,542.8 348.6,542.8 350.4,540.4 352.3,537.8 354.1,537.7 356.0,537.7 357.9,537.7 359.7,537.7 361.6,536.1 363.4,533.5 365.3,531.0 367.1,528.5 369.0,528.5 370.9,528.5 372.7,528.5 374.6,528.5 376.4,528.5 378.3,528.5 380.1,528.5 382.0,528.5 383.9,528.5 385.7,528.5 387.6,528.5 389.4,528.5 391.3,528.5 393.1,528.5 395.0,528.5 396.9,528.5 398.7,528.5 400.6,528.5 402.4,528.5 404.3,528.5 406.1,528.4 408.0,525.9 409.9,523.4 411.7,523.4 413.6,523.4 415.4,523.4 417.3,523.4 419.1,521.6 421.0,519.1 422.9,516.5 424.7,514.2 426.6,514.2 428.4,514.2 430.3,514.2 432.1,514.2 434.0,514.2 435.9,514.2 437.7,514.2 439.6,514.2 441.4,514.2 443.3,514.2 445.1,514.2 447.0,514.2 448.9,514.2 450.7,514.2 452.6,514.2 454.4,514.2 456.3,514.2 458.1,514.2 460.0,514.2 461.9,514.2 463.7,514.0 465.6,511.4 467.4,509.1 469.3,509.1 471.1,509.1 473.0,509.1 474.9,509.1 476.7,507.2 478.6,504.6 480.4,502.1 482.3,499.9 484.1,499.9 486.0,499.9 487.9,499.9 489.7,499.9 491.6,499.9 493.4,499.9 495.3,499.9 497.1,499.9 499.0,499.9 500.9,499.9 502.7,499.9 504.6,499.9 506.4,499.9 508.3,499.9 510.1,499.9 512.0,499.9 513.9,499.9 515.7,499.9 517.6,499.9 519.4,499.9 521.3,498.7 523.1,496.1 525.0,494.8 526.9,494.8 528.7,494.8 530.6,494.8 532.4,494.4 534.3,491.8 536.1,489.3 538.0,486.7 539.9,485.6 541.7,485.6 543.6,485.6 545.4,485.6 547.3,485.6 549.1,485.6 551.0,485.6 552.9,485.6 554.7,485.6 556.6,485.6 558.4,485.6 560.3,485.6 562.1,485.6 564.0,485.6 565.9,485.6 567.7,485.6 569.6,485.6 571.4,485.6 573.3,485.6 575.1,485.6 577.0,485.6 578.9,484.2 580.7,481.6 582.6,480.5 584.4,480.5 586.3,480.5 588.1,480.5 590.0,480.5 591.9,478.2 593.7,475.7 595.6,473.1 597.4,472.2 599.3,472.2 601.1,472.2 603.0,472.2 604.9,472.2 606.7,472.2 608.6,472.2 610.4,472.2 612.3,472.2 614.1,472.2 616.0,472.2 617.9,472.2 619.7,472.2 621.6,472.2 623.4,472.2 625.3,472.2 627.1,472.2 629.0,472.2 630.9,472.2 632.7,470.6 634.6,468.0 636.4,467.1 638.3,467.1 640.1,467.1 642.0,467.1 643.9,467.1 645.7,464.6 647.6,462.1 649.4,459.5 651.3,458.7 653.1,458.7 655.0,458.7 656.9,458.7 658.7,458.7 660.6,458.7 662.4,458.7 664.3,458.7 666.1,458.7 668.0,458.7 669.9,458.7 671.7,458.7 673.6,458.7 675.4,458.7 677.3,458.7 679.1,458.7 681.0,458.7 682.9,458.7 684.7,458.7 686.6,457.0 688.4,454.4 690.3,453.6 692.1,453.6 694.0,453.6 695.9,453.6 697.7,453.6 699.6,452.7 701.4,450.2 703.3,450.0 705.1,450.0 707.0,450.0 708.9,450.0 710.7,450.0 712.6,450.0 714.4,450.0 716.3,450.0 718.1,450.0" fill="none" stroke="#256abf" stroke-width="2" stroke-linejoin="round"/>
+<line x1="356" x2="380" y1="424" y2="424" stroke="#256abf" stroke-width="2"/>
+<text x="386" y="428" font-size="11" fill="#52514e" text-anchor="start" font-weight="400">weekly % used by autopilot</text>
+<line x1="566" x2="590" y1="424" y2="424" stroke="#8a8984" stroke-width="2" stroke-dasharray="5 4"/>
+<text x="596" y="428" font-size="11" fill="#52514e" text-anchor="start" font-weight="400">linear pace (weekly cap = pace + pace_margin)</text>
+<text x="728" y="454" font-size="12" fill="#0b0b0b" text-anchor="start" font-weight="600">100%</text>
+<text x="32" y="650" font-size="11" fill="#8a8984" text-anchor="start" font-weight="400">≈ 30 h of work in 11 windows (4.2 h/day). Your own usage opens windows and raises weekly %, so autopilot then keeps to each window's tail.</text>
+</svg>
