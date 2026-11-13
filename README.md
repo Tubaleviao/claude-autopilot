@@ -6,15 +6,29 @@ Cron job that spends leftover Claude Code budget on roadmap work: each tick read
 - `config.example.json` → copy to `config.json` (gitignored) and edit. Also local: `reports/`, `logs/`, `worktrees/`, `state.json`, `*.jsonl`, `PAUSE`
 
 ## Setup
-    python3 autopilot.py --dry-run                      # show the decision
+1. **Requirements**: Linux/macOS with cron, Python 3.9+ (stdlib only), `git`, [GitHub CLI](https://cli.github.com) logged in (`gh auth login`), and [Claude Code](https://docs.claude.com/en/docs/claude-code) logged in with a Pro/Max subscription (`claude` → `/login`; usage is read from `~/.claude/.credentials.json`, an API key does not work).
+2. **Projects**: each project is a git clone at `<projects_dir>/<name>` whose `origin` is on GitHub, with a roadmap (`ROADMAP.md` by default) on its default branch. Runs use `claude --dangerously-skip-permissions` inside a worktree, so only list repos you trust it to edit.
+3. **Config**: copy the example and edit it:
+
+       cp config.example.json config.json
+
+   - `projects`: replace `my-project` / `another-project` with your projects, highest priority first. Each name must be the **exact folder name** under `projects_dir`.
+   - `projects_dir`: folder that holds those clones (default `~/projects`).
+   - `project_opts`: delete the `another-project` example, or rename its key to one of your projects (keys must match names in `projects`).
+   - `notify_telegram`: set `false` unless a Claude Code Telegram channel is set up (`~/.claude/channels/telegram/`).
+4. **Check** it: `mkdir -p logs && python3 autopilot.py --dry-run` should print a decision without errors.
+5. **Cron**: `crontab -e` and add (replace `/path/to`):
+
+       */10 * * * * PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin HOME=$HOME flock -n /path/to/claude-autopilot/lock python3 /path/to/claude-autopilot/autopilot.py >> /path/to/claude-autopilot/logs/tick.log 2>&1
+
+   `PATH` must include the folders holding `claude` and `gh` (check with `which claude gh`).
+
+Other commands:
+
     python3 autopilot.py --simulate "u5=60 r5=20 u7=10 r7=96" --dry-run
     python3 autopilot.py --force --project my-project --mode implement
     python3 autopilot.py --unblock my-project           # release a BLOCKED park
     touch PAUSE                                         # disable (rm to resume)
-
-Needs `gh` authenticated. Cron:
-
-    */10 * * * * PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin HOME=$HOME flock -n /path/to/claude-autopilot/lock python3 /path/to/claude-autopilot/autopilot.py >> /path/to/claude-autopilot/logs/tick.log 2>&1
 
 ## Claude usage limits
 Two limits apply at once:
