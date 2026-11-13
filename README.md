@@ -6,15 +6,15 @@ Cron job that spends leftover Claude Code budget on roadmap work: each tick read
 - `config.example.json` → copy to `config.json` (gitignored) and edit. Also local: `reports/`, `logs/`, `worktrees/`, `state.json`, `*.jsonl`, `PAUSE`
 
 ## Setup
-    python3 autopilot.py --dry-run                      # show the decision
-    python3 autopilot.py --simulate "u5=60 r5=20 u7=10 r7=96" --dry-run
-    python3 autopilot.py --force --project my-project --mode implement
-    python3 autopilot.py --unblock my-project           # release a BLOCKED park
-    touch PAUSE                                         # disable (rm to resume)
+Needs Python 3.9+, `gh` logged in, and Claude Code logged in with a Pro/Max subscription.
 
-Needs `gh` authenticated. Cron:
+1. `cp config.example.json config.json`, then set `projects` to your project **folder names** under `projects_dir` (highest priority first) and fix or delete the `project_opts` example. Each project needs a GitHub `origin` and a `ROADMAP.md`.
+2. `mkdir -p logs && python3 autopilot.py --dry-run` should print a decision.
+3. Add to `crontab -e` (PATH must reach `claude` and `gh`):
 
-    */10 * * * * PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin HOME=$HOME flock -n /path/to/claude-autopilot/lock python3 /path/to/claude-autopilot/autopilot.py >> /path/to/claude-autopilot/logs/tick.log 2>&1
+       */10 * * * * PATH=$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin HOME=$HOME flock -n /path/to/claude-autopilot/lock python3 /path/to/claude-autopilot/autopilot.py >> /path/to/claude-autopilot/logs/tick.log 2>&1
+
+`touch PAUSE` disables it; `--force --project X --mode implement` runs now; `--unblock X` releases a BLOCKED park.
 
 ## Claude usage limits
 Two limits apply at once:
