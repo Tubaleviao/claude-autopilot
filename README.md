@@ -8,7 +8,7 @@ Cron job that spends leftover Claude Code budget on roadmap work: each tick read
 ## Setup
 Needs Python 3.9+, `gh` logged in, and Claude Code logged in with a Pro/Max subscription.
 
-1. `cp config.example.json config.json`, then set `projects` to your project **folder names** under `projects_dir` (highest priority first) and fix or delete the `project_opts` example. Each project needs a GitHub `origin` and a `ROADMAP.md`.
+1. `cp config.example.json config.json`, then set `projects` to your project **folder names** under `projects_dir` (highest priority first) and fix or delete the `project_opts` example. Every key is explained in [docs/config.md](docs/config.md). Each project needs a GitHub `origin` and a `ROADMAP.md`.
 2. `mkdir -p logs && python3 autopilot.py --dry-run` should print a decision.
 3. Add to `crontab -e` (PATH must reach `claude` and `gh`):
 
