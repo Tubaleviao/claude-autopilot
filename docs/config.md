@@ -34,7 +34,6 @@ Copy `config.example.json` to `config.json` and edit. `u5` = % of the current 5h
 | `min_window_headroom_pct` ✱ | 3 (1–10) | Don't start when less than this % of the window is left. |
 | `max_u5` / `max_u7` | 97 / 98 | Hard stops for the window and the week, also in burn mode. |
 | `default_k` ✱ | 0.12 (0.05–0.3) | Weekly % per 1% of a window, used until enough data in `usage-log.jsonl` to learn it. |
-| `min_k_samples` | 5 | Not used. |
 | `burn` | `false` | Spend as fast as possible, ignoring pacing (same as `--burn`). |
 
 ## Runs

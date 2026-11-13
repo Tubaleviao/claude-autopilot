@@ -12,7 +12,6 @@
   "max_u7": 98,
   "pace_margin": 4,
   "default_k": 0.12,
-  "min_k_samples": 5,
   "max_run_minutes": 45,
   "min_run_minutes": 15,
   "max_review_iterations": 8,
